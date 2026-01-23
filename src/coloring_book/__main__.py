@@ -1,8 +1,8 @@
 """Module entry point for CLI execution.
 
 Usage:
-    python -m coloring_book generate --animal cat --style kawaii
-    python -m coloring_book batch --file animals.txt --output docs/examples/
+    PYTHONPATH=src python -m coloring_book generate --animal cat --style kawaii
+    PYTHONPATH=src python -m coloring_book batch --file animals.txt --output docs/examples/
 """
 
 from .cli import main

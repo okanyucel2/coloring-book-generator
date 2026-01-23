@@ -86,6 +86,11 @@ Examples:
             help="Generate a single coloring page"
         )
         generate_parser.add_argument(
+            "--no-ai",
+            action="store_true",
+            help="Disable AI generation, use SVG only"
+        )
+        generate_parser.add_argument(
             "-a", "--animal",
             required=True,
             help="Animal name (e.g., cat, dog, elephant, any animal)"
@@ -112,6 +117,12 @@ Examples:
         batch_parser = subparsers.add_parser(
             "batch",
             help="Generate multiple coloring pages"
+        )
+
+        batch_parser.add_argument(
+            "--no-ai",
+            action="store_true",
+            help="Disable AI generation, use SVG only"
         )
 
         # Batch supports either --file or --animals
@@ -185,8 +196,9 @@ Examples:
 
     def cmd_generate(self, args) -> int:
         """Generate single page."""
+        no_ai = getattr(args, 'no_ai', False)
         pipeline = ColoringBookPipeline(
-            ai_enabled=not args.no_ai,
+            ai_enabled=not no_ai,
             ai_base_url=args.ai_url,
             png_dpi=args.dpi,
         )
@@ -228,8 +240,9 @@ Examples:
         logger.info(f"  Difficulty: {args.difficulty}")
         logger.info(f"  Output: {args.output}")
 
+        no_ai = getattr(args, 'no_ai', False)
         pipeline = ColoringBookPipeline(
-            ai_enabled=not args.no_ai,
+            ai_enabled=not no_ai,
             ai_base_url=args.ai_url,
             png_dpi=args.dpi,
         )

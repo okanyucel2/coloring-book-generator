@@ -15,9 +15,9 @@ from .png.exporter import PNGExporter
 
 logger = logging.getLogger(__name__)
 
-# Valid styles and difficulties
-VALID_STYLES = {"coloring_book", "kawaii", "realistic"}
-VALID_DIFFICULTIES = {"easy", "medium", "hard"}
+# Valid styles and difficulties (lists for consistent ordering in CLI help)
+VALID_STYLES = ["coloring_book", "kawaii", "realistic"]
+VALID_DIFFICULTIES = ["easy", "medium", "hard"]
 
 
 class ColoringBookPipeline:
