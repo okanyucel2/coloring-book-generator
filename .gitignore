@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+coverage.xml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Version tracking (GENESIS internal)
+**/versions/
+versions/
+
+# Docs (generated)
+docs/proofs/*.png
+
+# Temp
+*.tmp
+*.temp
+*.bak

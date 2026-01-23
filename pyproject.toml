@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coloring-book"
+version = "0.1.0"
+description = "Etsy Coloring Book Package Generator"
+authors = [{name = "GENESIS", email = "genesis@example.com"}]
+requires-python = ">=3.11"
+dependencies = [
+    "reportlab>=4.0.0",
+    "Pillow>=10.0.0",
+    "svglib>=1.4.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
