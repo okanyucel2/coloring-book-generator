@@ -91,6 +91,12 @@ Examples:
             help="Disable AI generation, use SVG only"
         )
         generate_parser.add_argument(
+            "-m", "--model",
+            default="imagen",
+            choices=["gemini", "imagen", "imagen-ultra"],
+            help="AI model (default: imagen). imagen-ultra for highest detail"
+        )
+        generate_parser.add_argument(
             "-a", "--animal",
             required=True,
             help="Animal name (e.g., cat, dog, elephant, any animal)"
@@ -123,6 +129,12 @@ Examples:
             "--no-ai",
             action="store_true",
             help="Disable AI generation, use SVG only"
+        )
+        batch_parser.add_argument(
+            "-m", "--model",
+            default="imagen",
+            choices=["gemini", "imagen", "imagen-ultra"],
+            help="AI model (default: imagen). imagen-ultra for highest detail"
         )
 
         # Batch supports either --file or --animals
@@ -206,9 +218,11 @@ Examples:
         # Determine output path
         output_path = args.output or Path(f"{args.animal}.png")
 
+        model = getattr(args, 'model', 'gemini')
         logger.info(f"Generating: {args.animal}")
         logger.info(f"  Style: {args.style}")
         logger.info(f"  Difficulty: {args.difficulty}")
+        logger.info(f"  Model: {model}")
         logger.info(f"  Output: {output_path}")
 
         try:
@@ -217,6 +231,7 @@ Examples:
                 style=args.style,
                 difficulty=args.difficulty,
                 output_path=output_path,
+                model=model,
             )
 
             logger.info(f"✅ Success! Generated {len(png_bytes)} bytes")
@@ -235,9 +250,11 @@ Examples:
         else:
             animals = args.animals
 
+        model = getattr(args, 'model', 'gemini')
         logger.info(f"Batch generating {len(animals)} animals")
         logger.info(f"  Style: {args.style}")
         logger.info(f"  Difficulty: {args.difficulty}")
+        logger.info(f"  Model: {model}")
         logger.info(f"  Output: {args.output}")
 
         no_ai = getattr(args, 'no_ai', False)
@@ -252,6 +269,7 @@ Examples:
             style=args.style,
             difficulty=args.difficulty,
             output_dir=args.output,
+            model=model,
         )
 
         # Summary

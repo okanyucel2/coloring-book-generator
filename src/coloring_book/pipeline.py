@@ -46,6 +46,7 @@ class ColoringBookPipeline:
         style: str = "coloring_book",
         difficulty: str = "medium",
         output_path: Optional[Path] = None,
+        model: str = "imagen",
     ) -> bytes:
         """Generate coloring book page.
 
@@ -59,6 +60,7 @@ class ColoringBookPipeline:
             style: Image style (coloring_book, kawaii, realistic)
             difficulty: Detail level (easy, medium, hard)
             output_path: Optional save path
+            model: AI model (gemini, imagen, imagen-ultra)
 
         Returns:
             PNG image bytes
@@ -74,11 +76,12 @@ class ColoringBookPipeline:
 
         # Try AI generation first
         if self.ai_enabled:
-            logger.info(f"Attempting AI generation: {animal} ({style}, {difficulty})")
+            logger.info(f"Attempting AI generation: {animal} ({style}, {difficulty}, {model})")
             ai_png = self.ai_generator.generate(
                 animal=animal,
                 style=style,
                 difficulty=difficulty,
+                model=model,
                 output_path=None,  # Don't save yet
             )
 
@@ -133,6 +136,7 @@ class ColoringBookPipeline:
         style: str = "coloring_book",
         difficulty: str = "medium",
         output_dir: Optional[Path] = None,
+        model: str = "imagen",
     ) -> dict[str, Optional[bytes]]:
         """Generate multiple coloring pages.
 
@@ -141,6 +145,7 @@ class ColoringBookPipeline:
             style: Image style
             difficulty: Detail level
             output_dir: Directory to save PNGs
+            model: AI model (gemini, imagen, imagen-ultra)
 
         Returns:
             Dictionary of {animal: png_bytes or None}
@@ -158,6 +163,7 @@ class ColoringBookPipeline:
                     style=style,
                     difficulty=difficulty,
                     output_path=output_path,
+                    model=model,
                 )
                 results[animal] = png_bytes
                 logger.info(f"✅ Generated: {animal}")

@@ -31,6 +31,7 @@ class AIColoringGenerator:
         output_path: Optional[Path] = None,
         style: str = "coloring_book",
         difficulty: str = "medium",
+        model: str = "imagen",
     ) -> Optional[bytes]:
         """Generate a coloring book image via the Genesis API.
 
@@ -39,12 +40,13 @@ class AIColoringGenerator:
             output_path: If provided, save PNG to this path
             style: Image style (coloring_book, kawaii, realistic)
             difficulty: Detail level (easy, medium, hard)
+            model: Generation model (gemini, imagen, imagen-ultra)
 
         Returns:
             PNG image bytes, or None if generation failed
         """
         url = f"{self.base_url}{GENERATE_ENDPOINT}"
-        payload = {"animal": animal, "style": style, "difficulty": difficulty}
+        payload = {"animal": animal, "style": style, "difficulty": difficulty, "model": model}
 
         try:
             with httpx.Client(timeout=self.timeout) as client:
