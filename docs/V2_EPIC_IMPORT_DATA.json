@@ -1,0 +1,283 @@
+{
+  "epic": {
+    "title": "AI Generation v2 - Multi-Model & Batch",
+    "project_slug": "project001",
+    "status": "active",
+    "description": "Next phase of AI-powered coloring book generation with multi-model comparison, batch processing, custom prompts, print-ready exports, and Etsy automation.",
+    "priority": "high",
+    "created_at": "2026-01-23T17:10:00Z"
+  },
+  "stories": [
+    {
+      "title": "Multi-Model Comparison UI",
+      "epic_slug": "ai-generation-v2",
+      "story_points": 5,
+      "priority": "high",
+      "status": "pending",
+      "description": "As a coloring book creator, I want to compare outputs from Gemini, Imagen, and Imagen Ultra side-by-side so that I can choose the best quality image for my books.",
+      "acceptance_criteria": [
+        "Three-column UI showing Gemini | Imagen | Ultra simultaneously",
+        "Same seed/prompt for fair comparison",
+        "Quick toggle between models",
+        "Performance metrics displayed (latency, quality score)"
+      ],
+      "tasks": [
+        {
+          "title": "Design 3-column comparison layout",
+          "description": "Create UI component with 3-column grid for side-by-side model output comparison",
+          "acceptance_criteria": [
+            "Layout responsive on desktop/tablet",
+            "Clear model labels and quality metrics",
+            "Switchable between different prompts"
+          ]
+        },
+        {
+          "title": "Implement simultaneous API calls (async)",
+          "description": "Call Gemini, Imagen, and Ultra APIs concurrently with same seed/prompt",
+          "acceptance_criteria": [
+            "All 3 models called in parallel",
+            "Timeout handling for slow calls",
+            "Error recovery per model"
+          ]
+        },
+        {
+          "title": "Add caching layer for same-seed comparisons",
+          "description": "Cache results for identical seed/prompt combinations",
+          "acceptance_criteria": [
+            "Cache hit rate > 80% in testing",
+            "TTL of 24 hours per cached result",
+            "Cache invalidation on API changes"
+          ]
+        },
+        {
+          "title": "Create model selection UI component",
+          "description": "Interactive component to select which models to display",
+          "acceptance_criteria": [
+            "Checkbox selection for each model",
+            "Visual indicator of selected models",
+            "Save preferences to localStorage"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Batch Generation + ZIP Export",
+      "epic_slug": "ai-generation-v2",
+      "story_points": 5,
+      "priority": "high",
+      "status": "pending",
+      "description": "As a seller, I want to generate 10-20 coloring book designs in one batch and download them as a ZIP file so that I can prepare multiple listings efficiently.",
+      "acceptance_criteria": [
+        "Batch size: 10-20 animals",
+        "Single ZIP file download with all books",
+        "Progress bar showing generation status",
+        "Memory-efficient streaming (no temp files on disk)"
+      ],
+      "tasks": [
+        {
+          "title": "Extend BatchRunner for multi-generate",
+          "description": "Modify BatchRunner to handle 10-20 simultaneous generations",
+          "acceptance_criteria": [
+            "Supports batch sizes 10-20",
+            "Parallel processing with queue management",
+            "Handles partial failures gracefully"
+          ]
+        },
+        {
+          "title": "Implement ZIP creation logic",
+          "description": "Create ZIP file from batch results without writing to disk",
+          "acceptance_criteria": [
+            "Streaming ZIP creation (in-memory)",
+            "Proper file structure (animal_name/images/...)",
+            "Compression ratio > 50%"
+          ]
+        },
+        {
+          "title": "Add progress tracking UI",
+          "description": "Real-time progress bar during batch generation",
+          "acceptance_criteria": [
+            "Updates every 500ms",
+            "Shows estimated time remaining",
+            "Cancel batch option"
+          ]
+        },
+        {
+          "title": "Memory optimization (streaming)",
+          "description": "Ensure memory usage stays under 500MB for 20-animal batch",
+          "acceptance_criteria": [
+            "Peak memory < 500MB during batch",
+            "No temporary files created",
+            "Garbage collection handles image cleanup"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Custom Prompt Support",
+      "epic_slug": "ai-generation-v2",
+      "story_points": 3,
+      "priority": "medium",
+      "status": "pending",
+      "description": "As an advanced user, I want to write custom prompts for image generation so that I can create unique coloring book styles beyond predefined animals.",
+      "acceptance_criteria": [
+        "Prompt template builder with variable substitution",
+        "Safety validation (no harmful content)",
+        "Example prompts library (50+)",
+        "Prompt history with search"
+      ],
+      "tasks": [
+        {
+          "title": "Create prompt template system",
+          "description": "Template engine supporting variables like {{animal}}, {{style}}, {{difficulty}}",
+          "acceptance_criteria": [
+            "Variable substitution working",
+            "Prompt preview before generation",
+            "Save templates for reuse"
+          ]
+        },
+        {
+          "title": "Implement content safety filter",
+          "description": "Validate prompts against safety guidelines",
+          "acceptance_criteria": [
+            "Blocks offensive content",
+            "False positive rate < 5%",
+            "Clear error messages for rejected prompts"
+          ]
+        },
+        {
+          "title": "Build example library (50+ prompts)",
+          "description": "Curated library of example prompts for inspiration",
+          "acceptance_criteria": [
+            "50+ quality examples",
+            "Organized by category (animals, styles, themes)",
+            "One-click prompt insertion"
+          ]
+        },
+        {
+          "title": "Add prompt history & search",
+          "description": "Store and search user's past prompts",
+          "acceptance_criteria": [
+            "Last 100 prompts stored",
+            "Full-text search functionality",
+            "Ability to load and edit past prompts"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "A4 Print-Ready PDF Export",
+      "epic_slug": "ai-generation-v2",
+      "story_points": 5,
+      "priority": "high",
+      "status": "pending",
+      "description": "As a publisher, I want to export coloring books as print-ready PDFs with 300 DPI and proper A4 layout so that I can send them directly to printers.",
+      "acceptance_criteria": [
+        "300 DPI minimum resolution",
+        "A4 (210x297mm) page format",
+        "Proper margins & bleed area (5mm)",
+        "Print preview before export"
+      ],
+      "tasks": [
+        {
+          "title": "Upgrade ReportLab PDF generator",
+          "description": "Add high-DPI support to existing PDF generator",
+          "acceptance_criteria": [
+            "Supports 300 DPI output",
+            "File size < 5MB per book",
+            "Colors accurate in CMYK mode"
+          ]
+        },
+        {
+          "title": "Implement DPI/resolution control",
+          "description": "Allow user to select output DPI (72, 150, 300, 600)",
+          "acceptance_criteria": [
+            "DPI selector UI",
+            "Real-time file size estimation",
+            "Compression options"
+          ]
+        },
+        {
+          "title": "Add multi-page handling",
+          "description": "Support multi-page PDFs for coloring book books",
+          "acceptance_criteria": [
+            "Up to 100 pages per PDF",
+            "Proper page numbering",
+            "Table of contents generation"
+          ]
+        },
+        {
+          "title": "Create print preview UI",
+          "description": "Show how PDF will look before export",
+          "acceptance_criteria": [
+            "Real-time preview of 1st page",
+            "Page layout preview",
+            "Margin/bleed visualization"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Etsy Listing Automation",
+      "epic_slug": "ai-generation-v2",
+      "story_points": 8,
+      "priority": "urgent",
+      "status": "pending",
+      "description": "As an Etsy seller, I want to automatically generate listing metadata, mockup images, and thumbnails for my coloring books so that I can publish them directly without manual work.",
+      "acceptance_criteria": [
+        "Auto-generated title, description, tags",
+        "Mockup image (book cover preview)",
+        "Thumbnail generation for listing",
+        "SEO-optimized metadata",
+        "Direct Etsy API integration"
+      ],
+      "tasks": [
+        {
+          "title": "Create Etsy API wrapper",
+          "description": "Wrapper around Etsy API v3 for listing creation",
+          "acceptance_criteria": [
+            "Authentication working",
+            "List products, create listings",
+            "Error handling for API limits",
+            "Retry logic for failed requests"
+          ]
+        },
+        {
+          "title": "Implement listing template system",
+          "description": "Templates for title, description, tags",
+          "acceptance_criteria": [
+            "Dynamic variable substitution",
+            "Multiple templates per category",
+            "Editor UI for customization"
+          ]
+        },
+        {
+          "title": "Build auto-tagging (animal + difficulty)",
+          "description": "Auto-generate SEO tags based on animal and difficulty level",
+          "acceptance_criteria": [
+            "Consistent tagging schema",
+            "10-15 tags per listing",
+            "Trending keywords included"
+          ]
+        },
+        {
+          "title": "Generate product mockups",
+          "description": "Create realistic book cover mockups for listings",
+          "acceptance_criteria": [
+            "3D book cover appearance",
+            "Customizable colors and fonts",
+            "Multiple angle views"
+          ]
+        },
+        {
+          "title": "Thumbnail creation logic",
+          "description": "Generate optimized thumbnails for Etsy listings",
+          "acceptance_criteria": [
+            "Multiple size variants (small, medium, large)",
+            "Optimized for web (< 100KB each)",
+            "Proper aspect ratio for Etsy"
+          ]
+        }
+      ]
+    }
+  ]
+}
