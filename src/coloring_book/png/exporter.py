@@ -136,7 +136,7 @@ class PNGExporter:
         ns = {'svg': 'http://www.w3.org/2000/svg'}
         
         # Default stroke width (2-3 pixels minimum)
-        min_stroke = max(2, int(3 * scale))
+        min_stroke = max(2, int(6 * scale))
         
         # ✅ Render ellipses (most common in animal SVGs)
         for ellipse in root.findall('.//svg:ellipse', ns):
