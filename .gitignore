@@ -37,6 +37,11 @@ versions/
 # Docs (generated)
 docs/proofs/*.png
 
+# Node.js
+node_modules/
+dist/
+*.tsbuildinfo
+
 # Temp
 *.tmp
 *.temp
