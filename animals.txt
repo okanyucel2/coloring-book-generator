@@ -1,0 +1,16 @@
+# Example animals for batch generation
+# One animal per line (lines starting with # are ignored)
+
+# SVG pipeline animals (registered)
+cat
+dog
+bird
+
+# AI generation animals (any valid animal name)
+elephant
+lion
+tiger
+butterfly
+penguin
+rabbit
+dolphin
