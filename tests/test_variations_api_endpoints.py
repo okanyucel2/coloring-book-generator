@@ -1,6 +1,12 @@
 """
-Tests for Variations API Endpoints (REST layer).
+Tests for Variations API Endpoints (REST layer) - REFACTORED v2
 Tests request validation, response formatting, and error handling.
+
+Refactored to:
+- Remove redundant validate_request() tests (Pydantic handles validation)
+- Test new error handling architecture with custom exceptions
+- Verify error classification (ValueError → 400, TemplateNotFoundError → 404)
+- Add comprehensive error handler tests
 """
 
 import pytest
@@ -9,7 +15,8 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from pydantic import ValidationError
 from src.coloring_book.api.variations_routes import (
-    VariationsAPI, VariationGenerationRequest, VariationGenerationResponse
+    VariationsAPI, VariationGenerationRequest, VariationGenerationResponse,
+    TemplateNotFoundError
 )
 from src.components.prompt_template_service import (
     PromptVariationService, PromptTemplate, VariationConfig
@@ -17,7 +24,7 @@ from src.components.prompt_template_service import (
 
 
 class TestVariationGenerationRequest:
-    """Tests for request validation."""
+    """Tests for request validation via Pydantic."""
     
     def test_valid_request(self):
         """Test valid request creation."""
@@ -201,7 +208,7 @@ class TestVariationsAPIEndpoints:
     
     @pytest.mark.asyncio
     async def test_generate_variations_template_not_found(self, api):
-        """Test error when template not found."""
+        """Test error when template not found (400 from service ValueError)."""
         request = VariationGenerationRequest(
             template_id="nonexistent",
             num_variations=5,
@@ -210,6 +217,7 @@ class TestVariationsAPIEndpoints:
         
         result = await api.generate_variations(request)
         
+        # PromptVariationService.generate_variations raises ValueError
         assert result["status"] == 400
         assert "error" in result
         assert "Template not found" in result["error"]
@@ -268,11 +276,12 @@ class TestVariationsAPIEndpoints:
     
     @pytest.mark.asyncio
     async def test_get_template_info_not_found(self, api):
-        """Test error when template not found."""
+        """Test error when template not found (404 from TemplateNotFoundError)."""
         result = await api.get_template_info("nonexistent")
         
         assert result["status"] == 404
         assert "error" in result
+        assert "not found" in result["error"].lower()
     
     @pytest.mark.asyncio
     async def test_list_templates(self, api, service):
@@ -292,111 +301,91 @@ class TestVariationsAPIEndpoints:
         assert len(result["data"]["templates"]) == 3
 
 
-class TestVariationsAPIValidation:
-    """Tests for request validation logic."""
+class TestErrorHandling:
+    """Tests for error handling mechanism with custom exceptions."""
     
-    @pytest.fixture
-    def api(self):
-        """Create API handler with mock service."""
-        service = MagicMock()
-        return VariationsAPI(service)
+    def test_handle_error_success_operation(self):
+        """Test _handle_error with successful operation."""
+        def operation():
+            return {"data": {"key": "value"}}
+        
+        result = VariationsAPI._handle_error(operation)
+        
+        assert result["status"] == 200
+        assert result["data"]["key"] == "value"
     
-    def test_validate_request_valid(self, api):
-        """Test validation of valid request."""
-        request = {
-            "template_id": "template_123",
-            "num_variations": 5,
-            "variables": {"animal": ["cat", "dog"]},
-            "seed": 42
-        }
+    def test_handle_error_custom_status(self):
+        """Test _handle_error with custom success status."""
+        def operation():
+            return {"data": {"key": "value"}}
         
-        is_valid, error = api.validate_request(request)
+        result = VariationsAPI._handle_error(operation, status_ok=201)
         
-        assert is_valid is True
-        assert error is None
+        assert result["status"] == 201
+        assert result["data"]["key"] == "value"
     
-    def test_validate_request_missing_template_id(self, api):
-        """Test validation fails for missing template_id."""
-        request = {
-            "num_variations": 5,
-            "variables": {"animal": ["cat"]}
-        }
+    def test_handle_error_value_error_default_mapping(self):
+        """Test _handle_error with ValueError (default error_map)."""
+        def operation():
+            raise ValueError("Invalid input")
         
-        is_valid, error = api.validate_request(request)
+        result = VariationsAPI._handle_error(operation)
         
-        assert is_valid is False
-        assert "template_id" in error
+        assert result["status"] == 400
+        assert "Invalid input" in result["error"]
     
-    def test_validate_request_missing_variables(self, api):
-        """Test validation fails for missing variables."""
-        request = {
-            "template_id": "template_123",
-            "num_variations": 5
-        }
+    def test_handle_error_template_not_found_default_mapping(self):
+        """Test _handle_error with TemplateNotFoundError (default error_map)."""
+        def operation():
+            raise TemplateNotFoundError("Template not found: xyz")
         
-        is_valid, error = api.validate_request(request)
+        result = VariationsAPI._handle_error(operation)
         
-        assert is_valid is False
-        assert "variables" in error
+        assert result["status"] == 404
+        assert "Template not found" in result["error"]
     
-    def test_validate_request_invalid_num_variations(self, api):
-        """Test validation fails for invalid num_variations."""
-        request = {
-            "template_id": "template_123",
-            "num_variations": 101,
-            "variables": {"animal": ["cat"]}
-        }
+    def test_handle_error_generic_exception_default_mapping(self):
+        """Test _handle_error with unmapped exception (default → 500)."""
+        def operation():
+            raise RuntimeError("Unexpected error")
         
-        is_valid, error = api.validate_request(request)
+        result = VariationsAPI._handle_error(operation)
         
-        assert is_valid is False
-        assert "num_variations" in error
+        assert result["status"] == 500
+        assert "Internal server error" in result["error"]
     
-    def test_validate_request_variables_not_dict(self, api):
-        """Test validation fails if variables is not dict."""
-        request = {
-            "template_id": "template_123",
-            "variables": ["animal", "cat"]
-        }
+    def test_handle_error_custom_error_map(self):
+        """Test _handle_error with custom error mapping."""
+        class CustomError(Exception):
+            pass
         
-        is_valid, error = api.validate_request(request)
+        def operation():
+            raise CustomError("Custom problem")
         
-        assert is_valid is False
-        assert "variables must be a dictionary" in error
+        custom_map = {CustomError: 418}  # I'm a teapot
+        result = VariationsAPI._handle_error(operation, error_map=custom_map)
+        
+        assert result["status"] == 418
+        assert "Custom problem" in result["error"]
     
-    def test_validate_request_variable_options_not_list(self, api):
-        """Test validation fails if variable options is not list."""
-        request = {
-            "template_id": "template_123",
-            "variables": {"animal": "cat"}
-        }
+    def test_handle_error_preserves_exception_message(self):
+        """Test that error handler preserves exception messages."""
+        def operation():
+            raise ValueError("Specific validation issue")
         
-        is_valid, error = api.validate_request(request)
+        result = VariationsAPI._handle_error(operation)
         
-        assert is_valid is False
-        assert "must be a list" in error
+        # Message should be preserved without modification
+        assert result["error"] == "Specific validation issue"
     
-    def test_validate_request_variable_empty_options(self, api):
-        """Test validation fails for empty variable options."""
-        request = {
-            "template_id": "template_123",
-            "variables": {"animal": []}
-        }
+    def test_handle_error_enhances_generic_500_messages(self):
+        """Test that generic 500 errors get enhanced messages."""
+        def operation():
+            raise RuntimeError("Database connection failed")
         
-        is_valid, error = api.validate_request(request)
+        result = VariationsAPI._handle_error(operation)
         
-        assert is_valid is False
-        assert "has no options" in error
-    
-    def test_validate_request_seed_not_int(self, api):
-        """Test validation fails if seed is not int."""
-        request = {
-            "template_id": "template_123",
-            "variables": {"animal": ["cat"]},
-            "seed": "not_an_int"
-        }
-        
-        is_valid, error = api.validate_request(request)
-        
-        assert is_valid is False
-        assert "seed must be an integer" in error
+        assert result["status"] == 500
+        # Message should be enhanced for generic exceptions
+        assert "Internal server error" in result["error"]
+        assert "Database connection failed" in result["error"]

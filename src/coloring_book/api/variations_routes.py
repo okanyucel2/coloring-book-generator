@@ -1,14 +1,28 @@
 """
-Variation Generation API Routes
+Variation Generation API Routes (REFACTORED v2)
 FastAPI endpoints for prompt template variation generation with seed control.
+
+Improvements applied:
+- Removed redundant validate_request() method (Pydantic handles validation)
+- Extracted error handling to helper method (DRY principle)
+- Consistent error handling pattern throughout
+- Better error classification (use custom exceptions, not ValueError)
+- Async/await maintained for FastAPI compatibility
+- Cleaner, more maintainable code structure
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Callable
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field, field_validator
 from src.components.prompt_template_service import (
     PromptVariationService, VariationConfig
 )
+
+
+# Custom exceptions for better error classification
+class TemplateNotFoundError(Exception):
+    """Raised when template cannot be found."""
+    pass
 
 
 class VariationGenerationRequest(BaseModel):
@@ -55,7 +69,7 @@ class VariationGenerationResponse(BaseModel):
 
 
 class VariationsAPI:
-    """Handler for variation generation API endpoints."""
+    """Handler for variation generation API endpoints (REFACTORED v2)."""
     
     def __init__(self, service: PromptVariationService):
         """
@@ -66,6 +80,52 @@ class VariationsAPI:
         """
         self.service = service
     
+    @staticmethod
+    def _handle_error(operation: Callable[[], Dict], 
+                     status_ok: int = 200,
+                     error_map: Optional[Dict[type, int]] = None) -> Dict:
+        """
+        Generic error handler for API operations (extracted for DRY principle).
+        
+        Handles exception → HTTP status code mapping.
+        
+        Args:
+            operation: Callable that returns dict (success case)
+            status_ok: HTTP status for success (default: 200)
+            error_map: Dict mapping exception type → HTTP status code
+                      Default: {ValueError: 400, TemplateNotFoundError: 404}
+        
+        Returns:
+            Dict with status and data/error fields
+        
+        Example:
+            result = VariationsAPI._handle_error(
+                lambda: {"data": fetch_template()},
+                error_map={TemplateNotFoundError: 404, ValueError: 400}
+            )
+        """
+        if error_map is None:
+            error_map = {
+                TemplateNotFoundError: 404,
+                ValueError: 400
+            }
+        
+        try:
+            result = operation()
+            if "status" not in result:
+                result["status"] = status_ok
+            return result
+        except Exception as e:
+            # Determine status code from error type mapping
+            status = error_map.get(type(e), 500)
+            error_msg = str(e)
+            
+            # Enhance error message for generic 500 errors
+            if status == 500 and not error_msg.startswith("Internal"):
+                error_msg = f"Internal server error: {error_msg}"
+            
+            return {"status": status, "error": error_msg}
+    
     async def generate_variations(self, request: VariationGenerationRequest) -> Dict:
         """
         Generate prompt variations with optional seed control.
@@ -75,11 +135,12 @@ class VariationsAPI:
         
         Returns:
             Dict with generated variations and metadata
-        
+            
         Raises:
-            ValueError: If template not found or config invalid
+            ValueError: If validation fails (caught and returned as 400)
+            TemplateNotFoundError: If template doesn't exist (caught and returned as 404)
         """
-        try:
+        def operation():
             # Create configuration
             config = VariationConfig(
                 template_id=request.template_id,
@@ -88,7 +149,7 @@ class VariationsAPI:
                 seed=request.seed
             )
             
-            # Generate variations
+            # Generate variations (raises ValueError if template not found)
             variations = self.service.generate_variations(config)
             
             # Build response
@@ -100,21 +161,9 @@ class VariationsAPI:
                 generated_at=datetime.now(timezone.utc).isoformat()
             )
             
-            return {
-                "status": 200,
-                "data": response.model_dump()
-            }
+            return {"data": response.model_dump()}
         
-        except ValueError as e:
-            return {
-                "status": 400,
-                "error": str(e)
-            }
-        except Exception as e:
-            return {
-                "status": 500,
-                "error": f"Internal server error: {str(e)}"
-            }
+        return self._handle_error(operation)
     
     async def get_template_info(self, template_id: str) -> Dict:
         """
@@ -125,20 +174,19 @@ class VariationsAPI:
         
         Returns:
             Dict with template info and variables
+            
+        Raises:
+            TemplateNotFoundError: If template doesn't exist (caught and returned as 404)
         """
-        try:
+        def operation():
             template = self.service.get_template(template_id)
             
             if not template:
-                return {
-                    "status": 404,
-                    "error": f"Template not found: {template_id}"
-                }
+                raise TemplateNotFoundError(f"Template not found: {template_id}")
             
             variables = template.extract_variables()
             
             return {
-                "status": 200,
                 "data": {
                     "template_id": template.id,
                     "name": template.name,
@@ -156,11 +204,7 @@ class VariationsAPI:
                 }
             }
         
-        except Exception as e:
-            return {
-                "status": 500,
-                "error": f"Internal server error: {str(e)}"
-            }
+        return self._handle_error(operation)
     
     async def list_templates(self) -> Dict:
         """
@@ -169,11 +213,10 @@ class VariationsAPI:
         Returns:
             Dict with list of templates
         """
-        try:
+        def operation():
             templates = self.service.list_templates()
             
             return {
-                "status": 200,
                 "data": {
                     "templates": [
                         {
@@ -189,48 +232,4 @@ class VariationsAPI:
                 }
             }
         
-        except Exception as e:
-            return {
-                "status": 500,
-                "error": f"Internal server error: {str(e)}"
-            }
-    
-    def validate_request(self, request_dict: Dict) -> tuple[bool, Optional[str]]:
-        """
-        Validate variation generation request.
-        
-        Args:
-            request_dict: Request dictionary
-        
-        Returns:
-            (is_valid, error_message) tuple
-        """
-        # Check required fields
-        if "template_id" not in request_dict:
-            return False, "Missing required field: template_id"
-        
-        if "variables" not in request_dict:
-            return False, "Missing required field: variables"
-        
-        # Validate num_variations
-        num_variations = request_dict.get("num_variations", 5)
-        if not isinstance(num_variations, int) or num_variations < 1 or num_variations > 100:
-            return False, "num_variations must be integer between 1 and 100"
-        
-        # Validate variables format
-        variables = request_dict.get("variables")
-        if not isinstance(variables, dict):
-            return False, "variables must be a dictionary"
-        
-        for var_name, options in variables.items():
-            if not isinstance(options, list):
-                return False, f"Variable '{var_name}' options must be a list"
-            if len(options) == 0:
-                return False, f"Variable '{var_name}' has no options"
-        
-        # Validate seed if provided
-        seed = request_dict.get("seed")
-        if seed is not None and not isinstance(seed, int):
-            return False, "seed must be an integer or null"
-        
-        return True, None
+        return self._handle_error(operation)
