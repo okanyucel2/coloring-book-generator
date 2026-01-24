@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coloring Book Generator - Batch Mode</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        header {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+        .status {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+        .main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        .panel {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            font-size: 1.3rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #34495e;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        button {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        .btn-primary:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: #ecf0f1;
+            color: #34495e;
+        }
+        .btn-secondary:hover {
+            background: #d5dbdb;
+        }
+        .progress-section {
+            margin-top: 2rem;
+        }
+        .job-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #3498db;
+        }
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .job-title {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .job-status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-processing {
+            background: #cfe2ff;
+            color: #084298;
+        }
+        .status-completed {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+        .status-failed {
+            background: #f8d7da;
+            color: #842029;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #3498db;
+            transition: width 0.3s;
+        }
+        .job-meta {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: #7f8c8d;
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #842029;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        .success-message {
+            background: #d1e7dd;
+            color: #0f5132;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎨 Coloring Book Generator</h1>
+            <p class="status">Batch Generation & Management</p>
+        </header>
+
+        <div class="main">
+            <!-- Generation Form -->
+            <div class="panel">
+                <h2>New Batch Job</h2>
+                <form id="batchForm">
+                    <div class="form-group">
+                        <label for="jobName">Job Name</label>
+                        <input 
+                            type="text" 
+                            id="jobName" 
+                            placeholder="e.g., Safari Animals Set"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="animalCount">Number of Animals</label>
+                        <input 
+                            type="number" 
+                            id="animalCount" 
+                            min="1" 
+                            max="100" 
+                            value="5"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="animalList">Animal Types (comma-separated)</label>
+                        <textarea 
+                            id="animalList"
+                            placeholder="cat, dog, lion, elephant, zebra"
+                        ></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="pageSize">Page Size</label>
+                        <select id="pageSize">
+                            <option value="A4">A4 (210x297mm)</option>
+                            <option value="LETTER">Letter (8.5x11in)</option>
+                            <option value="CUSTOM">Custom</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="useAI">Use AI for Missing Animals</label>
+                        <select id="useAI">
+                            <option value="true">Yes</option>
+                            <option value="false">No (SVG Only)</option>
+                        </select>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn-primary">Start Batch Job</button>
+                        <button type="reset" class="btn-secondary">Clear Form</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Active Jobs -->
+            <div class="panel">
+                <h2>Active Jobs</h2>
+                <div id="jobsList" class="progress-section">
+                    <div class="empty-state">
+                        <p>No active jobs</p>
+                        <p style="font-size: 0.9rem;">Create a new batch job on the left</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api/v1';
+        
+        // Load active jobs on page load
+        document.addEventListener('DOMContentLoaded', loadJobs);
+
+        // Form submission
+        document.getElementById('batchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const jobName = document.getElementById('jobName').value;
+            const animalCount = parseInt(document.getElementById('animalCount').value);
+            const animalList = document.getElementById('animalList').value;
+            const pageSize = document.getElementById('pageSize').value;
+            const useAI = document.getElementById('useAI').value === 'true';
+
+            try {
+                const response = await fetch(`${API_BASE}/batch/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        job_name: jobName,
+                        animal_count: animalCount,
+                        animal_types: animalList.split(',').map(a => a.trim()).filter(a => a),
+                        page_size: pageSize,
+                        use_ai: useAI
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                showMessage(`Job created: ${data.job_id}`, 'success');
+                document.getElementById('batchForm').reset();
+                loadJobs();
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        async function loadJobs() {
+            try {
+                const response = await fetch(`${API_BASE}/batch/jobs`);
+                if (!response.ok) throw new Error('Failed to load jobs');
+                
+                const data = await response.json();
+                renderJobs(data.jobs || []);
+            } catch (error) {
+                console.error('Error loading jobs:', error);
+            }
+        }
+
+        function renderJobs(jobs) {
+            const container = document.getElementById('jobsList');
+            
+            if (jobs.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>No active jobs</p>
+                        <p style="font-size: 0.9rem;">Create a new batch job on the left</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = jobs.map(job => `
+                <div class="job-item">
+                    <div class="job-header">
+                        <span class="job-title">${job.name}</span>
+                        <span class="job-status status-${job.status.toLowerCase()}">
+                            ${job.status}
+                        </span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${(job.progress || 0) * 100}%"></div>
+                    </div>
+                    <div class="job-meta">
+                        ${job.current}/${job.total} items • Job ID: ${job.id}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showMessage(message, type) {
+            const container = document.querySelector('header');
+            const msgEl = document.createElement('div');
+            msgEl.className = `${type}-message`;
+            msgEl.textContent = message;
+            container.appendChild(msgEl);
+            
+            setTimeout(() => msgEl.remove(), 4000);
+        }
+
+        // Poll for job updates every 2 seconds
+        setInterval(loadJobs, 2000);
+    </script>
+</body>
+</html>
