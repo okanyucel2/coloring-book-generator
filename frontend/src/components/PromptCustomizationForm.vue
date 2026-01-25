@@ -72,7 +72,7 @@
       </div>
 
       <div v-else class="no-variables">
-        <p>No variables detected. Add {{variable}} placeholders to your prompt.</p>
+        <p v-pre>No variables detected. Add {{variable}} placeholders to your prompt.</p>
       </div>
     </div>
 
