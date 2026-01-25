@@ -17,6 +17,7 @@
     "vue": "^3.3.4"
   },
   "devDependencies": {
+    "@genesis/playwright-config": "workspace:*",
     "@genesis/tsconfig": "workspace:*",
     "@playwright/test": "^1.58.0",
     "@vitejs/plugin-vue": "^4.5.0",
