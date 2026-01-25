@@ -22,16 +22,16 @@ describe('ComparisonLayout Component - TDD Flow', () => {
 
     it('should render models in correct order: Claude, GPT-4, Gemini', () => {
       const headers = wrapper.findAll('.model-header h2')
-      expect(headers[0].text()).toBe('Claude 3.5')
-      expect(headers[1].text()).toBe('GPT-4')
-      expect(headers[2].text()).toBe('Gemini 2.0')
+      expect(headers.at(0)?.text()).toBe('Claude 3.5')
+      expect(headers.at(1)?.text()).toBe('GPT-4')
+      expect(headers.at(2)?.text()).toBe('Gemini 2.0')
     })
 
     it('should assign correct data-model attributes to columns', () => {
       const columns = wrapper.findAll('.model-column')
-      expect(columns[0].attributes('data-model')).toBe('claude')
-      expect(columns[1].attributes('data-model')).toBe('gpt4')
-      expect(columns[2].attributes('data-model')).toBe('gemini')
+      expect(columns.at(0)?.attributes('data-model')).toBe('claude')
+      expect(columns.at(1)?.attributes('data-model')).toBe('gpt4')
+      expect(columns.at(2)?.attributes('data-model')).toBe('gemini')
     })
   })
 
@@ -39,7 +39,7 @@ describe('ComparisonLayout Component - TDD Flow', () => {
     it('should show placeholder text when no output exists', () => {
       const placeholders = wrapper.findAll('.model-placeholder')
       expect(placeholders).toHaveLength(3)
-      expect(placeholders[0].text()).toBe('Waiting for output...')
+      expect(placeholders.at(0)?.text()).toBe('Waiting for output...')
     })
 
     it('should display image when output is provided', async () => {
@@ -50,7 +50,7 @@ describe('ComparisonLayout Component - TDD Flow', () => {
       
       const images = wrapper.findAll('.output-image')
       expect(images.length).toBeGreaterThan(0)
-      expect(images[0].attributes('src')).toBe('data:image/png;base64,test')
+      expect(images.at(0)?.attributes('src')).toBe('data:image/png;base64,test')
     })
 
     it('should replace placeholder with image when output is set', async () => {
@@ -60,7 +60,7 @@ describe('ComparisonLayout Component - TDD Flow', () => {
       await wrapper.vm.$nextTick()
       
       const columns = wrapper.findAll('.model-column')
-      const gpt4Column = columns[1]
+      const gpt4Column = columns.at(1)!
       const image = gpt4Column.find('.output-image')
       
       expect(image.exists()).toBe(true)
@@ -86,9 +86,9 @@ describe('ComparisonLayout Component - TDD Flow', () => {
       await wrapper.vm.$nextTick()
       
       const images = wrapper.findAll('.output-image')
-      expect(images[0].attributes('alt')).toBe('Claude 3.5 output')
-      expect(images[1].attributes('alt')).toBe('GPT-4 output')
-      expect(images[2].attributes('alt')).toBe('Gemini 2.0 output')
+      expect(images.at(0)?.attributes('alt')).toBe('Claude 3.5 output')
+      expect(images.at(1)?.attributes('alt')).toBe('GPT-4 output')
+      expect(images.at(2)?.attributes('alt')).toBe('Gemini 2.0 output')
     })
   })
 

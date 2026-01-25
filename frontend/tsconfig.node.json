@@ -1,0 +1,4 @@
+{
+  "extends": "@genesis/tsconfig/node.json",
+  "include": ["vite.config.ts"]
+}

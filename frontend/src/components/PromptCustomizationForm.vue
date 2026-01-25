@@ -140,7 +140,8 @@ const detectedVariables = computed(() => {
   let match
 
   while ((match = regex.exec(customPrompt.value)) !== null) {
-    variables.add(match[1])
+    const varName = match[1]
+    if (varName) variables.add(varName)
   }
 
   return Array.from(variables).sort()
