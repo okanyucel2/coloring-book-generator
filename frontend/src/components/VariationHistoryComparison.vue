@@ -929,7 +929,7 @@ onMounted(() => {
 }
 
 .timeline-item.selected {
-  background: #f0f8f4;
+  background: var(--color-selected-bg);
   border-left: 4px solid var(--color-success);
 }
 
@@ -1026,14 +1026,14 @@ onMounted(() => {
 
 .badge.seed {
   background: var(--color-primary-light);
-  color: #1565c0;
+  color: var(--color-badge-blue-text);
   font-family: var(--font-mono);
   font-size: 0.8rem;
 }
 
 .badge.resolution {
-  background: #f3e5f5;
-  color: #6a1b9a;
+  background: var(--color-badge-purple-bg);
+  color: var(--color-badge-purple-text);
 }
 
 .notes-preview {
@@ -1315,7 +1315,7 @@ onMounted(() => {
 .model-badge,
 .resolution-badge {
   background: var(--color-primary-light);
-  color: #1565c0;
+  color: var(--color-badge-blue-text);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
   font-size: 0.9rem;
@@ -1404,7 +1404,7 @@ onMounted(() => {
   width: 100%;
   max-height: 60vh;
   overflow: hidden;
-  background: #000;
+  background: var(--color-image-backdrop);
 }
 
 .modal-image-container img {

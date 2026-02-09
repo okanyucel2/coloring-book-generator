@@ -120,4 +120,49 @@
   --z-modal: 50;
   --z-toast: 60;
   --z-header: 100;
+
+  /* === THEME-AWARE EXTRAS === */
+  --color-text-inverted: #fff;
+  --color-badge-blue-text: #1565c0;
+  --color-badge-purple-bg: #f3e5f5;
+  --color-badge-purple-text: #7b1fa2;
+  --color-selected-bg: #f0f8f4;
+  --color-image-backdrop: #000;
+  --color-header-accent: #2c3e50;
+}
+
+/* ========================================
+   LIGHT THEME OVERRIDES
+   Applied via [data-theme="light"] on <html>
+   ======================================== */
+[data-theme="light"] {
+  /* Shell becomes light */
+  --color-shell-bg-start: #f5f7fa;
+  --color-shell-bg-mid: #e8ecf1;
+  --color-shell-bg-end: #dce3ed;
+  --color-shell-surface: rgba(0, 0, 0, 0.03);
+  --color-shell-surface-hover: rgba(0, 0, 0, 0.06);
+  --color-shell-border: rgba(0, 0, 0, 0.1);
+  --color-shell-border-hover: rgba(0, 0, 0, 0.2);
+  --color-shell-text: #1a1a2e;
+  --color-shell-text-muted: #4a5568;
+  --color-shell-text-subtle: #718096;
+  --color-shell-text-dim: #a0aec0;
+
+  /* Surfaces stay light but with more contrast */
+  --color-surface-overlay: rgba(0, 0, 0, 0.4);
+
+  /* Shadows lighter */
+  --shadow-brand: 0 4px 15px rgba(102, 126, 234, 0.25);
+
+  /* Text inverted for brand gradients */
+  --color-text-inverted: #1a1a2e;
+
+  /* Badge adjustments for readability */
+  --color-badge-blue-text: #0d47a1;
+  --color-badge-purple-bg: #ede7f6;
+  --color-badge-purple-text: #4a148c;
+  --color-selected-bg: #e8f5e9;
+  --color-image-backdrop: #1a1a2e;
+  --color-header-accent: #37474f;
 }

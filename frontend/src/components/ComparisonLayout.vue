@@ -73,7 +73,7 @@ defineExpose({ setModelOutput, models })
 }
 
 .model-header {
-  background: #2c3e50;
+  background: var(--color-header-accent);
   color: white;
   padding: var(--space-4);
   text-align: center;
@@ -107,7 +107,7 @@ defineExpose({ setModelOutput, models })
 }
 
 h1 {
-  color: #2c3e50;
+  color: var(--color-header-accent);
   margin: 0 0 var(--space-4) 0;
 }
 

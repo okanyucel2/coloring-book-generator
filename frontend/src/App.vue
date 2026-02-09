@@ -17,6 +17,13 @@
           <span class="tab-label">{{ tab.label }}</span>
         </button>
       </nav>
+      <button
+        class="theme-toggle"
+        :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+        @click="toggleTheme"
+      >
+        {{ isDark ? '\u2600\uFE0F' : '\uD83C\uDF19' }}
+      </button>
     </header>
 
     <!-- Main Content Area -->
@@ -98,6 +105,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useTheme } from '@/composables/useTheme'
 import PromptLibraryUI from '@/components/PromptLibraryUI.vue'
 import VariationHistoryComparison from '@/components/VariationHistoryComparison.vue'
 import ComparisonLayout from '@/components/ComparisonLayout.vue'
@@ -166,6 +174,7 @@ const promptTemplates: Template[] = [
   }
 ]
 
+const { isDark, toggleTheme } = useTheme()
 const activeTab = ref('library')
 const comparisonRef = ref<InstanceType<typeof ComparisonLayout> | null>(null)
 const generatedOutput = ref<GeneratedOutput | null>(null)
@@ -325,7 +334,7 @@ html, body {
 .nav-tab.active {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
   border-color: var(--color-brand-start);
-  color: #fff;
+  color: var(--color-text-inverted);
 }
 
 .tab-icon {
@@ -334,6 +343,30 @@ html, body {
 
 .tab-label {
   font-weight: 500;
+}
+
+/* Theme Toggle */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: 1px solid var(--color-shell-border);
+  border-radius: var(--radius-full);
+  color: var(--color-shell-text);
+  cursor: pointer;
+  font-size: var(--text-xl);
+  transition: all var(--transition-slow) ease;
+  margin-left: var(--space-4);
+  flex-shrink: 0;
+}
+
+.theme-toggle:hover {
+  background: var(--color-shell-surface-hover);
+  border-color: var(--color-shell-border-hover);
+  transform: rotate(15deg);
 }
 
 /* Main Content */

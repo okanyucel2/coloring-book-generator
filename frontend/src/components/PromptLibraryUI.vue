@@ -678,7 +678,7 @@ onMounted(() => {
 
 .filter-tag:hover {
   border-color: var(--color-success);
-  background: #f9fff9;
+  background: var(--color-success-light);
 }
 
 .filter-tag.active {
@@ -795,8 +795,8 @@ onMounted(() => {
 }
 
 .badge.date {
-  background: #f3e5f5;
-  color: #7b1fa2;
+  background: var(--color-badge-purple-bg);
+  color: var(--color-badge-purple-text);
 }
 
 .card-tags {

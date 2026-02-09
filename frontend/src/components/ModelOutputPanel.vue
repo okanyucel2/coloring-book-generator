@@ -169,7 +169,7 @@ const toggleSelection = () => {
   justify-content: center;
   width: 100%;
   height: 200px;
-  background-color: #eeeeee;
+  background-color: var(--color-surface-muted);
   color: var(--color-text-tertiary);
   font-size: 14px;
   border-radius: var(--radius-md);
