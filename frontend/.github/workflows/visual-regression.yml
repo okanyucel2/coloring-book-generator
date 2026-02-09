@@ -18,7 +18,7 @@ on:
       - 'src/**'
       - '.storybook/**'
       - 'package.json'
-      - 'pnpm-lock.yaml'
+      # No pnpm-lock.yaml in standalone repo (workspace-managed)
       - '.github/workflows/visual-regression.yml'
 
   push:
@@ -28,7 +28,7 @@ on:
       - 'src/**'
       - '.storybook/**'
       - 'package.json'
-      - 'pnpm-lock.yaml'
+      # No pnpm-lock.yaml in standalone repo (workspace-managed)
       - '.github/workflows/visual-regression.yml'
 
 permissions:
@@ -62,7 +62,17 @@ jobs:
           cache: pnpm
 
       - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          # Strip workspace:* deps (only available in monorepo context)
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            for (const [name, ver] of Object.entries(pkg.devDependencies || {})) {
+              if (String(ver).startsWith('workspace:')) delete pkg.devDependencies[name];
+            }
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          pnpm install --no-frozen-lockfile
 
       - name: Build Storybook
         run: pnpm storybook:build
