@@ -42,6 +42,11 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Storybook & Visual Regression
+frontend/storybook-static/
+frontend/__screenshots__/
+frontend/coverage/
+
 # Temp
 *.tmp
 *.temp

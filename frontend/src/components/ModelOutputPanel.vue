@@ -97,48 +97,48 @@ const toggleSelection = () => {
 .model-output-panel {
   display: flex;
   flex-direction: column;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  border: 2px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
   padding: 16px;
-  background-color: #ffffff;
+  background-color: var(--color-surface-primary);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--transition-slow) ease;
   user-select: none;
 }
 
 .model-output-panel:hover {
-  border-color: #999;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-text-tertiary);
+  box-shadow: var(--shadow-md);
 }
 
 .model-output-panel:focus {
   outline: none;
-  border-color: #2196f3;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
 }
 
 .model-output-panel.selected {
-  border-color: #2196f3;
-  background-color: #f0f7ff;
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-surface);
   box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
 }
 
 .model-output-panel.quality-premium {
-  border-left: 4px solid #4caf50;
+  border-left: 4px solid var(--color-success);
 }
 
 .model-output-panel.quality-medium {
-  border-left: 4px solid #ff9800;
+  border-left: 4px solid var(--color-warning);
 }
 
 .model-output-panel.quality-low {
-  border-left: 4px solid #f44336;
+  border-left: 4px solid var(--color-danger);
 }
 
 .model-header {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 12px;
   text-align: center;
 }
@@ -151,8 +151,8 @@ const toggleSelection = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f5f5f5;
-  border-radius: 6px;
+  background-color: var(--color-surface-muted);
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -169,10 +169,10 @@ const toggleSelection = () => {
   justify-content: center;
   width: 100%;
   height: 200px;
-  background-color: #eeeeee;
-  color: #999;
+  background-color: var(--color-surface-muted);
+  color: var(--color-text-tertiary);
   font-size: 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .error-message {
@@ -180,10 +180,10 @@ const toggleSelection = () => {
   bottom: 8px;
   left: 8px;
   right: 8px;
-  background-color: #ffebee;
-  color: #c62828;
+  background-color: var(--color-danger-light);
+  color: var(--color-danger-text);
   padding: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   text-align: center;
 }
@@ -193,7 +193,7 @@ const toggleSelection = () => {
   gap: 16px;
   justify-content: space-around;
   padding: 8px 0;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--color-border-light);
 }
 
 .metric {
@@ -205,7 +205,7 @@ const toggleSelection = () => {
 
 .metric-label {
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
@@ -213,7 +213,7 @@ const toggleSelection = () => {
 .metric-quality-score {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 @media (max-width: 768px) {

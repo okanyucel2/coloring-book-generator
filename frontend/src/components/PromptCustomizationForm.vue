@@ -215,22 +215,22 @@ const resetForm = () => {
   flex-direction: column;
   gap: 24px;
   padding: 24px;
-  background-color: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  background-color: var(--color-surface-primary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
 }
 
 .form-title {
   font-size: 20px;
   font-weight: 700;
-  color: #333;
+  color: var(--color-text-primary);
   margin-bottom: 8px;
 }
 
 .section-title {
   font-size: 14px;
   font-weight: 600;
-  color: #666;
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 12px;
@@ -254,42 +254,42 @@ const resetForm = () => {
   flex-direction: column;
   gap: 4px;
   padding: 12px;
-  border: 2px solid #e0e0e0;
-  border-radius: 6px;
-  background-color: #f9f9f9;
+  border: 2px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-tertiary);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--transition-slow) ease;
   text-align: left;
 }
 
 .template-button:hover {
-  border-color: #2196f3;
-  background-color: #f0f7ff;
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-surface);
 }
 
 .template-button.active {
-  border-color: #2196f3;
-  background-color: #e3f2fd;
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-light);
   box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2);
 }
 
 .template-name {
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
   font-size: 13px;
 }
 
 .template-desc {
   font-size: 11px;
-  color: #999;
+  color: var(--color-text-tertiary);
 }
 
 .template-info {
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-secondary);
   padding: 8px;
-  background-color: #f5f5f5;
-  border-radius: 4px;
+  background-color: var(--color-surface-muted);
+  border-radius: var(--radius-sm);
 }
 
 /* Prompt Editor */
@@ -308,38 +308,38 @@ const resetForm = () => {
 .editor-container label {
   font-size: 13px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .prompt-textarea {
   padding: 12px;
   border: 1px solid #ddd;
-  border-radius: 6px;
-  font-family: 'Monaco', 'Courier New', monospace;
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
   font-size: 13px;
   resize: vertical;
-  transition: border-color 0.3s ease;
+  transition: border-color var(--transition-slow) ease;
 }
 
 .prompt-textarea:focus {
   outline: none;
-  border-color: #2196f3;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
 }
 
 .char-count {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-tertiary);
   text-align: right;
 }
 
 .length-warning {
   font-size: 12px;
-  color: #ff9800;
+  color: var(--color-warning);
   padding: 8px;
-  background-color: #fff3e0;
-  border-left: 3px solid #ff9800;
-  border-radius: 4px;
+  background-color: var(--color-warning-light);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-sm);
 }
 
 /* Preview Section */
@@ -348,14 +348,14 @@ const resetForm = () => {
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  background-color: #f5f5f5;
-  border-radius: 6px;
+  background-color: var(--color-surface-muted);
+  border-radius: var(--radius-md);
 }
 
 .preview-title {
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -363,10 +363,10 @@ const resetForm = () => {
 .prompt-preview {
   font-size: 13px;
   line-height: 1.6;
-  color: #333;
+  color: var(--color-text-primary);
   padding: 8px;
-  background-color: #ffffff;
-  border-radius: 4px;
+  background-color: var(--color-surface-primary);
+  border-radius: var(--radius-sm);
   min-height: 60px;
   word-wrap: break-word;
   white-space: pre-wrap;
@@ -394,9 +394,9 @@ const resetForm = () => {
 .variable-label {
   font-size: 12px;
   font-weight: 600;
-  color: #333;
-  font-family: 'Monaco', 'Courier New', monospace;
-  background-color: #f0f0f0;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  background-color: var(--color-surface-subtle);
   padding: 2px 6px;
   border-radius: 3px;
   display: inline-block;
@@ -406,23 +406,23 @@ const resetForm = () => {
 .variable-input {
   padding: 8px;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
-  transition: border-color 0.3s ease;
+  transition: border-color var(--transition-slow) ease;
 }
 
 .variable-input:focus {
   outline: none;
-  border-color: #2196f3;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
 }
 
 .no-variables {
   padding: 16px;
-  background-color: #f5f5f5;
-  border-radius: 6px;
+  background-color: var(--color-surface-muted);
+  border-radius: var(--radius-md);
   text-align: center;
-  color: #999;
+  color: var(--color-text-tertiary);
   font-size: 13px;
 }
 
@@ -440,51 +440,51 @@ const resetForm = () => {
   font-size: 13px;
   font-weight: 600;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--transition-slow) ease;
 }
 
 .btn-generate {
-  background-color: #2196f3;
+  background-color: var(--color-primary);
   color: white;
   flex: 2;
 }
 
 .btn-generate:hover:not(:disabled) {
-  background-color: #1976d2;
+  background-color: var(--color-primary-hover);
   box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
 }
 
 .btn-generate:disabled {
-  background-color: #ccc;
+  background-color: var(--color-surface-subtle);
   cursor: not-allowed;
-  color: #999;
+  color: var(--color-text-secondary);
 }
 
 .btn-copy {
-  background-color: #4caf50;
+  background-color: var(--color-success);
   color: white;
 }
 
 .btn-copy:hover:not(:disabled) {
-  background-color: #388e3c;
+  background-color: var(--color-success-dark);
   box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
 }
 
 .btn-copy:disabled {
-  background-color: #ccc;
+  background-color: var(--color-surface-subtle);
   cursor: not-allowed;
-  color: #999;
+  color: var(--color-text-secondary);
 }
 
 .btn-reset {
-  background-color: #f44336;
+  background-color: var(--color-danger);
   color: white;
 }
 
 .btn-reset:hover {
-  background-color: #d32f2f;
+  background-color: var(--color-danger-dark);
   box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
 }
 

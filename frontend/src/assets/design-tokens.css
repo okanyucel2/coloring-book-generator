@@ -1,0 +1,168 @@
+:root {
+  /* ========================================
+     COLORING BOOK GENERATOR - DESIGN TOKENS v1.0
+     Pattern: cigkoftecibey design-tokens.css
+     ======================================== */
+
+  /* === SHELL (Dark App Chrome) === */
+  --color-shell-bg-start: #1a1a2e;
+  --color-shell-bg-mid: #16213e;
+  --color-shell-bg-end: #0f3460;
+  --color-shell-surface: rgba(255, 255, 255, 0.05);
+  --color-shell-surface-hover: rgba(255, 255, 255, 0.08);
+  --color-shell-border: rgba(255, 255, 255, 0.1);
+  --color-shell-border-hover: rgba(255, 255, 255, 0.2);
+  --color-shell-text: #e0e0e0;
+  --color-shell-text-muted: #a0aec0;
+  --color-shell-text-subtle: #8892b0;
+  --color-shell-text-dim: #64748b;
+
+  /* === CONTENT AREAS (Light Panels) === */
+  --color-content-bg-start: #f5f7fa;
+  --color-content-bg-end: #c3cfe2;
+
+  /* Surfaces (cards, modals, panels) */
+  --color-surface-primary: #ffffff;
+  --color-surface-secondary: #fafafa;
+  --color-surface-tertiary: #f9f9f9;
+  --color-surface-muted: #f5f5f5;
+  --color-surface-subtle: #f0f0f0;
+  --color-surface-overlay: rgba(0, 0, 0, 0.5);
+
+  /* === TEXT (Light Theme Content) === */
+  --color-text-primary: #333;
+  --color-text-secondary: #666;
+  --color-text-tertiary: #999;
+
+  /* === BRAND === */
+  --color-brand-start: #667eea;
+  --color-brand-end: #764ba2;
+
+  /* === SEMANTIC === */
+  --color-primary: #2196f3;
+  --color-primary-hover: #1976d2;
+  --color-primary-light: #e3f2fd;
+  --color-primary-surface: #f0f7ff;
+
+  --color-success: #4CAF50;
+  --color-success-hover: #45a049;
+  --color-success-dark: #388e3c;
+  --color-success-light: #f1f8f6;
+
+  --color-warning: #ff9800;
+  --color-warning-light: #fff3e0;
+  --color-warning-surface: #fff3cd;
+  --color-warning-text: #856404;
+
+  --color-danger: #f44336;
+  --color-danger-hover: #da190b;
+  --color-danger-dark: #d32f2f;
+  --color-danger-light: #ffebee;
+  --color-danger-text: #c62828;
+
+  --color-star: #ffc107;
+
+  /* === BORDER === */
+  --color-border-light: #e0e0e0;
+
+  /* === TYPOGRAPHY === */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'Monaco', 'Courier New', monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  /* === SPACING (4px base) === */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* === BORDER RADIUS === */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-pill: 1.25rem;
+  --radius-full: 9999px;
+
+  /* === SHADOWS === */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.15);
+  --shadow-2xl: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-brand: 0 4px 15px rgba(102, 126, 234, 0.4);
+
+  /* Focus Rings */
+  --focus-ring: 0 0 0 3px rgba(33, 150, 243, 0.15);
+
+  /* === TRANSITIONS === */
+  --transition-fast: 150ms;
+  --transition-base: 200ms;
+  --transition-slow: 300ms;
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+
+  /* === Z-INDEX === */
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-modal-backdrop: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+  --z-header: 100;
+
+  /* === THEME-AWARE EXTRAS === */
+  --color-text-inverted: #fff;
+  --color-badge-blue-text: #1565c0;
+  --color-badge-purple-bg: #f3e5f5;
+  --color-badge-purple-text: #7b1fa2;
+  --color-selected-bg: #f0f8f4;
+  --color-image-backdrop: #000;
+  --color-header-accent: #2c3e50;
+}
+
+/* ========================================
+   LIGHT THEME OVERRIDES
+   Applied via [data-theme="light"] on <html>
+   ======================================== */
+[data-theme="light"] {
+  /* Shell becomes light */
+  --color-shell-bg-start: #f5f7fa;
+  --color-shell-bg-mid: #e8ecf1;
+  --color-shell-bg-end: #dce3ed;
+  --color-shell-surface: rgba(0, 0, 0, 0.03);
+  --color-shell-surface-hover: rgba(0, 0, 0, 0.06);
+  --color-shell-border: rgba(0, 0, 0, 0.1);
+  --color-shell-border-hover: rgba(0, 0, 0, 0.2);
+  --color-shell-text: #1a1a2e;
+  --color-shell-text-muted: #4a5568;
+  --color-shell-text-subtle: #718096;
+  --color-shell-text-dim: #a0aec0;
+
+  /* Surfaces stay light but with more contrast */
+  --color-surface-overlay: rgba(0, 0, 0, 0.4);
+
+  /* Shadows lighter */
+  --shadow-brand: 0 4px 15px rgba(102, 126, 234, 0.25);
+
+  /* Text inverted for brand gradients */
+  --color-text-inverted: #1a1a2e;
+
+  /* Badge adjustments for readability */
+  --color-badge-blue-text: #0d47a1;
+  --color-badge-purple-bg: #ede7f6;
+  --color-badge-purple-text: #4a148c;
+  --color-selected-bg: #e8f5e9;
+  --color-image-backdrop: #1a1a2e;
+  --color-header-accent: #37474f;
+}

@@ -1,0 +1,219 @@
+"""Coloring Book Generator — FastAPI Backend API"""
+import logging
+import random
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import Optional
+
+import httpx
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+
+from .models import Base, Prompt, Variation, create_tables, get_db
+from .schemas import GenerateRequest, PromptCreate, PromptUpdate, VariationUpdate
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_tables()
+    yield
+
+app = FastAPI(title="Coloring Book API", version="0.1.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def _prompt_to_dict(p: Prompt) -> dict:
+    return {
+        "id": p.id,
+        "name": p.name,
+        "promptText": p.prompt_text,
+        "category": p.category,
+        "tags": p.tags or [],
+        "isPublic": p.is_public,
+        "rating": p.rating,
+        "usageCount": p.usage_count,
+        "createdAt": p.created_at.isoformat() if p.created_at else None,
+        "updatedAt": p.updated_at.isoformat() if p.updated_at else None,
+    }
+
+
+def _variation_to_dict(v: Variation) -> dict:
+    return {
+        "id": v.id,
+        "prompt": v.prompt,
+        "model": v.model,
+        "imageUrl": v.image_url,
+        "rating": v.rating,
+        "seed": v.seed,
+        "notes": v.notes,
+        "parameters": v.parameters or {},
+        "generatedAt": v.generated_at.isoformat() if v.generated_at else None,
+    }
+
+
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
+
+
+# --- Prompt Library ---
+
+@app.get("/api/v1/prompts/library")
+async def list_prompts(db: Session = Depends(get_db)):
+    prompts = db.query(Prompt).all()
+    return {"data": [_prompt_to_dict(p) for p in prompts]}
+
+
+@app.post("/api/v1/prompts/library", status_code=201)
+async def create_prompt(body: PromptCreate, db: Session = Depends(get_db)):
+    prompt = Prompt(
+        name=body.name,
+        prompt_text=body.promptText,
+        category=body.category,
+        tags=body.tags,
+        is_public=body.isPublic,
+    )
+    db.add(prompt)
+    db.flush()
+    result = _prompt_to_dict(prompt)
+    db.commit()
+    return result
+
+
+@app.put("/api/v1/prompts/library/{prompt_id}")
+async def update_prompt(prompt_id: str, body: PromptUpdate, db: Session = Depends(get_db)):
+    prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+
+    if body.name is not None:
+        prompt.name = body.name
+    if body.promptText is not None:
+        prompt.prompt_text = body.promptText
+    if body.category is not None:
+        prompt.category = body.category
+    if body.tags is not None:
+        prompt.tags = body.tags
+    if body.isPublic is not None:
+        prompt.is_public = body.isPublic
+
+    prompt.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(prompt)
+    return _prompt_to_dict(prompt)
+
+
+@app.delete("/api/v1/prompts/library/{prompt_id}")
+async def delete_prompt(prompt_id: str, db: Session = Depends(get_db)):
+    prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+
+    db.delete(prompt)
+    db.commit()
+    return {"message": "Prompt deleted"}
+
+
+# --- Variations ---
+
+@app.get("/api/v1/variations/history")
+async def list_variations(db: Session = Depends(get_db)):
+    variations = db.query(Variation).all()
+    return {"data": [_variation_to_dict(v) for v in variations]}
+
+
+@app.patch("/api/v1/variations/{variation_id}")
+async def update_variation(variation_id: str, body: VariationUpdate, db: Session = Depends(get_db)):
+    variation = db.query(Variation).filter(Variation.id == variation_id).first()
+    if not variation:
+        raise HTTPException(status_code=404, detail="Variation not found")
+
+    if body.rating is not None:
+        variation.rating = body.rating
+    if body.notes is not None:
+        variation.notes = body.notes
+
+    db.commit()
+    db.refresh(variation)
+    return _variation_to_dict(variation)
+
+
+@app.delete("/api/v1/variations/history")
+async def clear_history(db: Session = Depends(get_db)):
+    count = db.query(Variation).delete()
+    db.commit()
+    return {"message": "History cleared", "deleted": count}
+
+
+@app.delete("/api/v1/variations/{variation_id}")
+async def delete_variation(variation_id: str, db: Session = Depends(get_db)):
+    variation = db.query(Variation).filter(Variation.id == variation_id).first()
+    if not variation:
+        raise HTTPException(status_code=404, detail="Variation not found")
+
+    db.delete(variation)
+    db.commit()
+    return {"message": "Variation deleted"}
+
+
+# --- Image Generation ---
+
+async def generate_image(
+    prompt: str,
+    model: str,
+    style: str = "coloring_book",
+    seed: Optional[int] = None,
+) -> dict:
+    """Call external image generation API and return result.
+
+    This function is the mockable seam for tests. In production it calls
+    the configured provider (DALL-E 3, SDXL, Imagen).
+
+    Returns:
+        dict with keys: image_url, seed, model
+    """
+    actual_seed = seed if seed is not None else random.randint(0, 2**31)
+    # Placeholder: in production, dispatch to real provider based on model
+    # For now, return a generated URL pattern
+    image_url = f"https://api.example.com/generated/{model}/{actual_seed}.png"
+    return {"image_url": image_url, "seed": actual_seed, "model": model}
+
+
+@app.post("/api/v1/generate", status_code=201)
+async def generate(body: GenerateRequest, db: Session = Depends(get_db)):
+    """Generate a coloring book image using the specified model."""
+    try:
+        result = await generate_image(
+            prompt=body.prompt,
+            model=body.model.value,
+            style=body.style,
+            seed=body.seed,
+        )
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="Image generation timed out")
+    except Exception as exc:
+        logger.warning(f"Image generation failed: {exc}")
+        raise HTTPException(status_code=502, detail=f"Image generation failed: {exc}")
+
+    variation = Variation(
+        prompt=body.prompt,
+        model=result["model"],
+        image_url=result["image_url"],
+        seed=result["seed"],
+        parameters={"style": body.style},
+    )
+    db.add(variation)
+    db.flush()
+    response = _variation_to_dict(variation)
+    db.commit()
+    return response

@@ -20,7 +20,7 @@ export interface ProgressUpdate {
 }
 
 export class ComparisonAPIService {
-  baseURL: string = 'https://api.example.com'
+  baseURL: string = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1'
   abortController: AbortController
   cache: Map<string, { data: ComparisonResults; timestamp: number }> = new Map()
   requestQueue: Promise<any>[] = []
