@@ -15,20 +15,18 @@ on:
     branches:
       - main
     paths:
-      - 'src/**'
-      - '.storybook/**'
-      - 'package.json'
-      # No pnpm-lock.yaml in standalone repo (workspace-managed)
+      - 'frontend/src/**'
+      - 'frontend/.storybook/**'
+      - 'frontend/package.json'
       - '.github/workflows/visual-regression.yml'
 
   push:
     branches:
       - main
     paths:
-      - 'src/**'
-      - '.storybook/**'
-      - 'package.json'
-      # No pnpm-lock.yaml in standalone repo (workspace-managed)
+      - 'frontend/src/**'
+      - 'frontend/.storybook/**'
+      - 'frontend/package.json'
       - '.github/workflows/visual-regression.yml'
 
 permissions:
@@ -45,6 +43,9 @@ jobs:
     name: Argos Visual Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
 
     steps:
       - name: Checkout Repository
@@ -54,12 +55,15 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install Dependencies
         run: |
