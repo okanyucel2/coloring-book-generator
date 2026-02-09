@@ -103,6 +103,7 @@ import VariationHistoryComparison from '@/components/VariationHistoryComparison.
 import ComparisonLayout from '@/components/ComparisonLayout.vue'
 import PromptCustomizationForm from '@/components/PromptCustomizationForm.vue'
 import ModelOutputPanel from '@/components/ModelOutputPanel.vue'
+import { apiService } from '@/services/api'
 
 interface Tab {
   id: string
@@ -184,17 +185,42 @@ const handleGenerate = async (payload: GeneratePayload) => {
   isGenerating.value = true
   generatedOutput.value = null
 
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 2000))
+  const startTime = performance.now()
 
-  // Set demo output with proper structure
-  generatedOutput.value = {
-    modelName: 'DALL-E 3',
-    imageUrl: `https://picsum.photos/seed/custom-${Date.now()}/600/400`,
-    generationTime: 2.3,
-    qualityScore: 0.92
+  try {
+    const result = await apiService.post<{
+      id: string
+      prompt: string
+      model: string
+      imageUrl: string
+      seed: number
+      generatedAt: string
+    }>('/generate', {
+      prompt: payload.prompt,
+      model: 'dalle3',
+      style: 'coloring_book',
+    })
+
+    const elapsed = (performance.now() - startTime) / 1000
+
+    generatedOutput.value = {
+      modelName: result.model || 'DALL-E 3',
+      imageUrl: result.imageUrl || '',
+      generationTime: elapsed,
+      qualityScore: 0.92,
+    }
+  } catch (error) {
+    console.error('Generation failed:', error)
+    // Fallback to placeholder on error so UI doesn't break
+    generatedOutput.value = {
+      modelName: 'DALL-E 3 (offline)',
+      imageUrl: `https://picsum.photos/seed/fallback-${Date.now()}/600/400`,
+      generationTime: 0,
+      qualityScore: 0,
+    }
+  } finally {
+    isGenerating.value = false
   }
-  isGenerating.value = false
 }
 
 const handleReset = () => {
