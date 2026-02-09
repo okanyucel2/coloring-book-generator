@@ -28,6 +28,11 @@
 
     <!-- Main Content Area -->
     <main class="app-main">
+      <!-- Workbook Builder Tab -->
+      <div v-show="activeTab === 'workbook'" class="tab-content">
+        <WorkbookBuilder />
+      </div>
+
       <!-- Prompt Library Tab -->
       <div v-show="activeTab === 'library'" class="tab-content">
         <PromptLibraryUI />
@@ -106,6 +111,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useTheme } from '@/composables/useTheme'
+import WorkbookBuilder from '@/components/WorkbookBuilder.vue'
 import PromptLibraryUI from '@/components/PromptLibraryUI.vue'
 import VariationHistoryComparison from '@/components/VariationHistoryComparison.vue'
 import ComparisonLayout from '@/components/ComparisonLayout.vue'
@@ -140,6 +146,7 @@ interface GeneratePayload {
 }
 
 const tabs: Tab[] = [
+  { id: 'workbook', label: 'Workbook Builder', icon: '\u{1F4D6}' },
   { id: 'library', label: 'Prompt Library', icon: '\u{1F4DA}' },
   { id: 'history', label: 'Variation History', icon: '\u{1F4C5}' },
   { id: 'comparison', label: 'Model Comparison', icon: '\u{1F4C8}' },
@@ -175,7 +182,7 @@ const promptTemplates: Template[] = [
 ]
 
 const { isDark, toggleTheme } = useTheme()
-const activeTab = ref('library')
+const activeTab = ref('workbook')
 const comparisonRef = ref<InstanceType<typeof ComparisonLayout> | null>(null)
 const generatedOutput = ref<GeneratedOutput | null>(null)
 const isGenerating = ref(false)

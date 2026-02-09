@@ -38,3 +38,44 @@ export interface Variation {
   notes: string | null
   createdAt: string
 }
+
+export interface WorkbookTheme {
+  slug: string
+  display_name: string
+  category: string
+  items: string[]
+  item_count: number
+  age_groups: string[]
+  etsy_tags: string[]
+}
+
+export interface WorkbookConfig {
+  theme: string
+  title: string
+  subtitle?: string
+  age_min: number
+  age_max: number
+  page_count: number
+  items: string[]
+  activity_mix: Record<string, number>
+  page_size: string
+}
+
+export interface WorkbookResponse {
+  id: string
+  theme: string
+  title: string
+  subtitle?: string
+  age_min: number
+  age_max: number
+  page_count: number
+  items: string[]
+  activity_mix: Record<string, number>
+  page_size: string
+  status: 'draft' | 'generating' | 'ready' | 'failed'
+  progress: number | null
+  pdf_url: string | null
+  etsy_listing_id: string | null
+  created_at: string | null
+  updated_at: string | null
+}

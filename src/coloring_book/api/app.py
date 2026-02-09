@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 
 from .models import Base, Prompt, Variation, create_tables, get_db
 from .schemas import GenerateRequest, PromptCreate, PromptUpdate, VariationUpdate
+from .workbook_routes import router as workbook_router
+from .etsy_routes import router as etsy_router
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount workbook and Etsy routes
+app.include_router(workbook_router)
+app.include_router(etsy_router)
 
 
 def _prompt_to_dict(p: Prompt) -> dict:
