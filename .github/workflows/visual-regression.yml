@@ -15,20 +15,18 @@ on:
     branches:
       - main
     paths:
-      - 'src/**'
-      - '.storybook/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
+      - 'frontend/src/**'
+      - 'frontend/.storybook/**'
+      - 'frontend/package.json'
       - '.github/workflows/visual-regression.yml'
 
   push:
     branches:
       - main
     paths:
-      - 'src/**'
-      - '.storybook/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
+      - 'frontend/src/**'
+      - 'frontend/.storybook/**'
+      - 'frontend/package.json'
       - '.github/workflows/visual-regression.yml'
 
 permissions:
@@ -45,6 +43,9 @@ jobs:
     name: Argos Visual Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
 
     steps:
       - name: Checkout Repository
@@ -54,15 +55,68 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+
+      - name: Prepare standalone context
+        run: |
+          # Strip workspace:* deps (only available in monorepo context)
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            for (const [name, ver] of Object.entries(pkg.devDependencies || {})) {
+              if (String(ver).startsWith('workspace:')) delete pkg.devDependencies[name];
+            }
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          # Inline tsconfig (replaces @genesis/tsconfig which is workspace-only)
+          cat > tsconfig.json << 'TSEOF'
+          {
+            "compilerOptions": {
+              "target": "ES2020",
+              "module": "ESNext",
+              "lib": ["ES2020", "DOM", "DOM.Iterable"],
+              "skipLibCheck": true,
+              "moduleResolution": "bundler",
+              "allowImportingTsExtensions": true,
+              "isolatedModules": true,
+              "moduleDetection": "force",
+              "noEmit": true,
+              "resolveJsonModule": true,
+              "strict": true,
+              "noUnusedLocals": false,
+              "noUnusedParameters": false,
+              "noFallthroughCasesInSwitch": true,
+              "useDefineForClassFields": true,
+              "jsx": "preserve",
+              "baseUrl": ".",
+              "paths": { "@/*": ["./src/*"] }
+            },
+            "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
+            "references": [{ "path": "./tsconfig.node.json" }]
+          }
+          TSEOF
+          cat > tsconfig.node.json << 'TSEOF'
+          {
+            "compilerOptions": {
+              "composite": true,
+              "skipLibCheck": true,
+              "module": "ESNext",
+              "moduleResolution": "bundler",
+              "allowSyntheticDefaultImports": true,
+              "strict": true
+            },
+            "include": ["vite.config.ts"]
+          }
+          TSEOF
 
       - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build Storybook
         run: pnpm storybook:build
