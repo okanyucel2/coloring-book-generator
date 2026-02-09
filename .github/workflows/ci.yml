@@ -1,0 +1,193 @@
+# .github/workflows/ci.yml
+#
+# CI Pipeline: Unit Tests + Type Checking for Coloring Book Generator
+#
+# Runs vitest unit tests (425 tests) and vue-tsc type checking on every
+# PR to main and push to main when frontend source changes.
+
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'frontend/src/**'
+      - 'frontend/package.json'
+      - '.github/workflows/ci.yml'
+
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/src/**'
+      - 'frontend/package.json'
+      - '.github/workflows/ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Prepare standalone context
+        run: |
+          # Strip workspace:* deps (only available in monorepo context)
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            for (const [name, ver] of Object.entries(pkg.devDependencies || {})) {
+              if (String(ver).startsWith('workspace:')) delete pkg.devDependencies[name];
+            }
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          # Inline tsconfig (replaces @genesis/tsconfig which is workspace-only)
+          cat > tsconfig.json << 'TSEOF'
+          {
+            "compilerOptions": {
+              "target": "ES2020",
+              "module": "ESNext",
+              "lib": ["ES2020", "DOM", "DOM.Iterable"],
+              "skipLibCheck": true,
+              "moduleResolution": "bundler",
+              "allowImportingTsExtensions": true,
+              "isolatedModules": true,
+              "moduleDetection": "force",
+              "noEmit": true,
+              "resolveJsonModule": true,
+              "strict": true,
+              "noUnusedLocals": false,
+              "noUnusedParameters": false,
+              "noFallthroughCasesInSwitch": true,
+              "useDefineForClassFields": true,
+              "jsx": "preserve",
+              "baseUrl": ".",
+              "paths": { "@/*": ["./src/*"] }
+            },
+            "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
+            "references": [{ "path": "./tsconfig.node.json" }]
+          }
+          TSEOF
+          cat > tsconfig.node.json << 'TSEOF'
+          {
+            "compilerOptions": {
+              "composite": true,
+              "skipLibCheck": true,
+              "module": "ESNext",
+              "moduleResolution": "bundler",
+              "allowSyntheticDefaultImports": true,
+              "strict": true
+            },
+            "include": ["vite.config.ts"]
+          }
+          TSEOF
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run Unit Tests
+        run: pnpm test
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Prepare standalone context
+        run: |
+          # Strip workspace:* deps (only available in monorepo context)
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            for (const [name, ver] of Object.entries(pkg.devDependencies || {})) {
+              if (String(ver).startsWith('workspace:')) delete pkg.devDependencies[name];
+            }
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          # Inline tsconfig (replaces @genesis/tsconfig which is workspace-only)
+          cat > tsconfig.json << 'TSEOF'
+          {
+            "compilerOptions": {
+              "target": "ES2020",
+              "module": "ESNext",
+              "lib": ["ES2020", "DOM", "DOM.Iterable"],
+              "skipLibCheck": true,
+              "moduleResolution": "bundler",
+              "allowImportingTsExtensions": true,
+              "isolatedModules": true,
+              "moduleDetection": "force",
+              "noEmit": true,
+              "resolveJsonModule": true,
+              "strict": true,
+              "noUnusedLocals": false,
+              "noUnusedParameters": false,
+              "noFallthroughCasesInSwitch": true,
+              "useDefineForClassFields": true,
+              "jsx": "preserve",
+              "baseUrl": ".",
+              "paths": { "@/*": ["./src/*"] }
+            },
+            "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
+            "references": [{ "path": "./tsconfig.node.json" }]
+          }
+          TSEOF
+          cat > tsconfig.node.json << 'TSEOF'
+          {
+            "compilerOptions": {
+              "composite": true,
+              "skipLibCheck": true,
+              "module": "ESNext",
+              "moduleResolution": "bundler",
+              "allowSyntheticDefaultImports": true,
+              "strict": true
+            },
+            "include": ["vite.config.ts"]
+          }
+          TSEOF
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run Type Check
+        run: pnpm typecheck
