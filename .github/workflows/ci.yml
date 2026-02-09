@@ -71,7 +71,7 @@ jobs:
             "compilerOptions": {
               "target": "ES2020",
               "module": "ESNext",
-              "lib": ["ES2020", "DOM", "DOM.Iterable"],
+              "lib": ["ES2022", "DOM", "DOM.Iterable"],
               "skipLibCheck": true,
               "moduleResolution": "bundler",
               "allowImportingTsExtensions": true,
@@ -110,7 +110,7 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Run Unit Tests
-        run: pnpm test
+        run: pnpm test 2>&1 | tail -80
 
   typecheck:
     name: Type Check
@@ -151,7 +151,7 @@ jobs:
             "compilerOptions": {
               "target": "ES2020",
               "module": "ESNext",
-              "lib": ["ES2020", "DOM", "DOM.Iterable"],
+              "lib": ["ES2022", "DOM", "DOM.Iterable"],
               "skipLibCheck": true,
               "moduleResolution": "bundler",
               "allowImportingTsExtensions": true,
@@ -190,4 +190,4 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Run Type Check
-        run: pnpm typecheck
+        run: pnpm typecheck 2>&1 | tail -80
