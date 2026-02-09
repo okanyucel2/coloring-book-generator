@@ -66,10 +66,10 @@ defineExpose({ setModelOutput, models })
 }
 
 .model-column {
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--color-card-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  background: var(--color-surface-tertiary);
+  background: var(--color-card-bg);
 }
 
 .model-header {
@@ -100,14 +100,14 @@ defineExpose({ setModelOutput, models })
 }
 
 .model-placeholder {
-  color: var(--color-text-tertiary);
+  color: var(--color-card-text-muted);
   text-align: center;
   padding: var(--space-8);
   font-style: italic;
 }
 
 h1 {
-  color: var(--color-header-accent);
+  color: var(--color-heading-on-shell);
   margin: 0 0 var(--space-4) 0;
 }
 

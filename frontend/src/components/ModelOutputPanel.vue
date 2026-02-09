@@ -97,10 +97,10 @@ const toggleSelection = () => {
 .model-output-panel {
   display: flex;
   flex-direction: column;
-  border: 2px solid var(--color-border-light);
+  border: 2px solid var(--color-card-border);
   border-radius: var(--radius-lg);
-  padding: 16px;
-  background-color: var(--color-surface-primary);
+  padding: var(--space-4);
+  background-color: var(--color-card-bg);
   cursor: pointer;
   transition: all var(--transition-slow) ease;
   user-select: none;
@@ -138,7 +138,7 @@ const toggleSelection = () => {
 .model-header {
   font-size: 16px;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--color-card-text);
   margin-bottom: 12px;
   text-align: center;
 }
@@ -151,7 +151,7 @@ const toggleSelection = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-surface-muted);
+  background-color: var(--color-card-bg-secondary);
   border-radius: var(--radius-md);
   overflow: hidden;
 }
@@ -169,8 +169,8 @@ const toggleSelection = () => {
   justify-content: center;
   width: 100%;
   height: 200px;
-  background-color: var(--color-surface-muted);
-  color: var(--color-text-tertiary);
+  background-color: var(--color-card-bg-secondary);
+  color: var(--color-card-text-muted);
   font-size: 14px;
   border-radius: var(--radius-md);
 }
@@ -193,7 +193,7 @@ const toggleSelection = () => {
   gap: 16px;
   justify-content: space-around;
   padding: 8px 0;
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--color-card-divider);
 }
 
 .metric {
@@ -205,7 +205,7 @@ const toggleSelection = () => {
 
 .metric-label {
   font-size: 12px;
-  color: var(--color-text-secondary);
+  color: var(--color-card-text-secondary);
   font-weight: 500;
 }
 
@@ -213,7 +213,7 @@ const toggleSelection = () => {
 .metric-quality-score {
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--color-card-text);
 }
 
 @media (max-width: 768px) {

@@ -215,22 +215,22 @@ const resetForm = () => {
   flex-direction: column;
   gap: 24px;
   padding: 24px;
-  background-color: var(--color-surface-primary);
+  background-color: var(--color-card-bg);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--color-card-border);
 }
 
 .form-title {
   font-size: 20px;
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--color-card-heading);
   margin-bottom: 8px;
 }
 
 .section-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--color-card-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 12px;
@@ -254,9 +254,9 @@ const resetForm = () => {
   flex-direction: column;
   gap: 4px;
   padding: 12px;
-  border: 2px solid var(--color-border-light);
+  border: 2px solid var(--color-card-border);
   border-radius: var(--radius-md);
-  background-color: var(--color-surface-tertiary);
+  background-color: var(--color-card-bg-secondary);
   cursor: pointer;
   transition: all var(--transition-slow) ease;
   text-align: left;
@@ -275,20 +275,20 @@ const resetForm = () => {
 
 .template-name {
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--color-card-text);
   font-size: 13px;
 }
 
 .template-desc {
   font-size: 11px;
-  color: var(--color-text-tertiary);
+  color: var(--color-card-text-muted);
 }
 
 .template-info {
   font-size: 12px;
-  color: var(--color-text-secondary);
+  color: var(--color-card-text-secondary);
   padding: 8px;
-  background-color: var(--color-surface-muted);
+  background-color: var(--color-card-bg-secondary);
   border-radius: var(--radius-sm);
 }
 
@@ -308,13 +308,15 @@ const resetForm = () => {
 .editor-container label {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--color-card-text);
 }
 
 .prompt-textarea {
   padding: 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-input-border);
   border-radius: var(--radius-md);
+  background-color: var(--color-input-bg);
+  color: var(--color-input-text);
   font-family: var(--font-mono);
   font-size: 13px;
   resize: vertical;
@@ -329,7 +331,7 @@ const resetForm = () => {
 
 .char-count {
   font-size: 12px;
-  color: var(--color-text-tertiary);
+  color: var(--color-card-text-muted);
   text-align: right;
 }
 
@@ -348,14 +350,14 @@ const resetForm = () => {
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  background-color: var(--color-surface-muted);
+  background-color: var(--color-card-bg-secondary);
   border-radius: var(--radius-md);
 }
 
 .preview-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--color-card-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -363,9 +365,9 @@ const resetForm = () => {
 .prompt-preview {
   font-size: 13px;
   line-height: 1.6;
-  color: var(--color-text-primary);
+  color: var(--color-card-text);
   padding: 8px;
-  background-color: var(--color-surface-primary);
+  background-color: var(--color-input-bg);
   border-radius: var(--radius-sm);
   min-height: 60px;
   word-wrap: break-word;
@@ -394,9 +396,9 @@ const resetForm = () => {
 .variable-label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--color-card-text);
   font-family: var(--font-mono);
-  background-color: var(--color-surface-subtle);
+  background-color: var(--color-card-bg-secondary);
   padding: 2px 6px;
   border-radius: 3px;
   display: inline-block;
@@ -405,8 +407,10 @@ const resetForm = () => {
 
 .variable-input {
   padding: 8px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-input-border);
   border-radius: var(--radius-sm);
+  background-color: var(--color-input-bg);
+  color: var(--color-input-text);
   font-size: 13px;
   transition: border-color var(--transition-slow) ease;
 }
@@ -419,10 +423,10 @@ const resetForm = () => {
 
 .no-variables {
   padding: 16px;
-  background-color: var(--color-surface-muted);
+  background-color: var(--color-card-bg-secondary);
   border-radius: var(--radius-md);
   text-align: center;
-  color: var(--color-text-tertiary);
+  color: var(--color-card-text-muted);
   font-size: 13px;
 }
 
