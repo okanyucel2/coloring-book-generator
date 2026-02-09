@@ -16,8 +16,5 @@ export default createPlaywrightConfig({
   timeout: 10000,
   webServer: {
     command: `npx vite --port ${ports.frontend}`,
-    url: `http://localhost:${ports.frontend}`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
   },
 })
