@@ -174,7 +174,7 @@
             <label>Notes:</label>
             <textarea
               :value="variation.notes || ''"
-              @input="updateNotes(variation.id, $event.target.value)"
+              @input="updateNotes(variation.id, ($event.target as HTMLTextAreaElement).value)"
               placeholder="Add notes about this variation..."
               class="notes-input"
               rows="3"
@@ -400,25 +400,26 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { apiService } from '../services/api'
 import { sampleVariations } from '@/data/mock-data'
 import ConfirmDialog from './ConfirmDialog.vue'
 import SkeletonLoader from './SkeletonLoader.vue'
+import type { Variation, ConfirmDialogConfig, Notification } from '@/types'
 
-const variationHistory = ref([])
-const selectedVariations = ref([])
-const filterModel = ref('')
-const filterDate = ref('')
-const sortBy = ref('newest')
-const searchQuery = ref('')
-const isLoading = ref(false)
-const fullImageVariation = ref(null)
-const notification = ref(null)
+const variationHistory = ref<Variation[]>([])
+const selectedVariations = ref<Variation[]>([])
+const filterModel = ref<string>('')
+const filterDate = ref<string>('')
+const sortBy = ref<string>('newest')
+const searchQuery = ref<string>('')
+const isLoading = ref<boolean>(false)
+const fullImageVariation = ref<Variation | null>(null)
+const notification = ref<Notification | null>(null)
 
-const showConfirmDialog = ref(false)
-const confirmDialogConfig = ref({
+const showConfirmDialog = ref<boolean>(false)
+const confirmDialogConfig = ref<ConfirmDialogConfig>({
   title: '',
   message: '',
   confirmText: 'Confirm',
@@ -428,7 +429,7 @@ const confirmDialogConfig = ref({
 })
 
 // Computed properties
-const filteredVariations = computed(() => {
+const filteredVariations = computed((): Variation[] => {
   let results = [...variationHistory.value]
 
   // Apply model filter
@@ -467,9 +468,9 @@ const filteredVariations = computed(() => {
   results.sort((a, b) => {
     switch (sortBy.value) {
       case 'newest':
-        return new Date(b.createdAt) - new Date(a.createdAt)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       case 'oldest':
-        return new Date(a.createdAt) - new Date(b.createdAt)
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       case 'model':
         return a.model.localeCompare(b.model)
       case 'rating':
@@ -482,68 +483,68 @@ const filteredVariations = computed(() => {
   return results
 })
 
-const allSelected = computed(() => {
+const allSelected = computed((): boolean => {
   return filteredVariations.value.length > 0 &&
     filteredVariations.value.every(v => isVariationSelected(v.id))
 })
 
-const averageRating = computed(() => {
+const averageRating = computed((): number => {
   if (selectedVariations.value.length === 0) return 0
-  const sum = selectedVariations.value.reduce((acc, v) => acc + (v.rating || 0), 0)
+  const sum = selectedVariations.value.reduce((acc: number, v: Variation) => acc + (v.rating || 0), 0)
   return sum / selectedVariations.value.length
 })
 
-const highestRated = computed(() => {
+const highestRated = computed((): number => {
   if (selectedVariations.value.length === 0) return 0
   return Math.max(...selectedVariations.value.map(v => v.rating || 0))
 })
 
-const lowestRated = computed(() => {
+const lowestRated = computed((): number => {
   if (selectedVariations.value.length === 0) return 0
   const ratings = selectedVariations.value.map(v => v.rating || 0).filter(r => r > 0)
   return ratings.length > 0 ? Math.min(...ratings) : 0
 })
 
-const latestGeneration = computed(() => {
+const latestGeneration = computed((): Date | string => {
   if (selectedVariations.value.length === 0) return ''
-  return new Date(Math.max(...selectedVariations.value.map(v => new Date(v.createdAt))))
+  return new Date(Math.max(...selectedVariations.value.map(v => new Date(v.createdAt).getTime())))
 })
 
-const earliestGeneration = computed(() => {
+const earliestGeneration = computed((): Date | string => {
   if (selectedVariations.value.length === 0) return ''
-  return new Date(Math.min(...selectedVariations.value.map(v => new Date(v.createdAt))))
+  return new Date(Math.min(...selectedVariations.value.map(v => new Date(v.createdAt).getTime())))
 })
 
-const generationSpan = computed(() => {
+const generationSpan = computed((): string => {
   if (selectedVariations.value.length < 2) return 'N/A'
   const latest = new Date(latestGeneration.value)
   const earliest = new Date(earliestGeneration.value)
-  const diffMs = latest - earliest
+  const diffMs = latest.getTime() - earliest.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
   if (diffDays === 0) return 'Same day'
   return `${diffDays} day${diffDays > 1 ? 's' : ''}`
 })
 
 // Methods
-const loadHistory = async () => {
+const loadHistory = async (): Promise<void> => {
   isLoading.value = true
   try {
-    const response = await apiService.get('/variations/history')
+    const response = await apiService.get<{ data: Variation[] }>('/variations/history')
     variationHistory.value = response.data || []
-  } catch (error) {
+  } catch (error: unknown) {
     console.warn('API unavailable, using sample data')
-    variationHistory.value = sampleVariations
+    variationHistory.value = sampleVariations as unknown as Variation[]
     showNotification('Showing sample variations (API offline)', 'info')
   } finally {
     isLoading.value = false
   }
 }
 
-const isVariationSelected = (variationId) => {
+const isVariationSelected = (variationId: string): boolean => {
   return selectedVariations.value.some(v => v.id === variationId)
 }
 
-const toggleVariationSelect = (variationId) => {
+const toggleVariationSelect = (variationId: string): void => {
   const variation = variationHistory.value.find(v => v.id === variationId)
   if (!variation) return
 
@@ -555,17 +556,17 @@ const toggleVariationSelect = (variationId) => {
   }
 }
 
-const selectVariationForComparison = (variation) => {
+const selectVariationForComparison = (variation: Variation): void => {
   if (!isVariationSelected(variation.id)) {
     selectedVariations.value.push(variation)
   }
 }
 
-const deselectVariation = (variationId) => {
+const deselectVariation = (variationId: string): void => {
   selectedVariations.value = selectedVariations.value.filter(v => v.id !== variationId)
 }
 
-const toggleSelectAll = () => {
+const toggleSelectAll = (): void => {
   if (allSelected.value) {
     selectedVariations.value = []
   } else {
@@ -573,11 +574,11 @@ const toggleSelectAll = () => {
   }
 }
 
-const exitComparison = () => {
+const exitComparison = (): void => {
   selectedVariations.value = []
 }
 
-const rateVariation = async (variationId, rating) => {
+const rateVariation = async (variationId: string, rating: number): Promise<void> => {
   const variation = variationHistory.value.find(v => v.id === variationId)
   if (!variation) return
 
@@ -585,26 +586,26 @@ const rateVariation = async (variationId, rating) => {
     await apiService.patch(`/variations/${variationId}`, { rating })
     variation.rating = rating
     showNotification(`Rated ${rating} stars`, 'success')
-  } catch (error) {
+  } catch (error: unknown) {
     showNotification('Failed to save rating', 'error')
     console.error(error)
   }
 }
 
-const updateNotes = async (variationId, notes) => {
+const updateNotes = async (variationId: string, notes: string): Promise<void> => {
   const variation = variationHistory.value.find(v => v.id === variationId)
   if (!variation) return
 
   try {
     await apiService.patch(`/variations/${variationId}`, { notes })
     variation.notes = notes
-  } catch (error) {
+  } catch (error: unknown) {
     showNotification('Failed to save notes', 'error')
     console.error(error)
   }
 }
 
-const downloadVariation = (variation) => {
+const downloadVariation = (variation: Variation): void => {
   const link = document.createElement('a')
   link.href = variation.imageUrl
   link.download = `variation-${variation.id}-${variation.model}.png`
@@ -612,7 +613,7 @@ const downloadVariation = (variation) => {
   showNotification('Download started', 'success')
 }
 
-const duplicateVariation = (variation) => {
+const duplicateVariation = (variation: Variation): void => {
   const event = new CustomEvent('variation-selected', {
     detail: { variation },
     bubbles: true,
@@ -621,13 +622,13 @@ const duplicateVariation = (variation) => {
   showNotification('Variation ready to regenerate', 'success')
 }
 
-const shareVariation = (variation) => {
+const shareVariation = (variation: Variation): void => {
   const shareUrl = `${window.location.origin}/share/variation/${variation.id}`
   navigator.clipboard.writeText(shareUrl)
   showNotification('Share link copied to clipboard', 'success')
 }
 
-const deleteVariation = (variationId) => {
+const deleteVariation = (variationId: string): void => {
   confirmDialogConfig.value = {
     title: 'Delete Variation',
     message: 'This variation will be permanently deleted.',
@@ -640,7 +641,7 @@ const deleteVariation = (variationId) => {
         variationHistory.value = variationHistory.value.filter(v => v.id !== variationId)
         selectedVariations.value = selectedVariations.value.filter(v => v.id !== variationId)
         showNotification('Variation deleted', 'success')
-      } catch (error) {
+      } catch (error: unknown) {
         showNotification('Failed to delete variation', 'error')
         console.error(error)
       }
@@ -649,7 +650,7 @@ const deleteVariation = (variationId) => {
   showConfirmDialog.value = true
 }
 
-const clearHistory = () => {
+const clearHistory = (): void => {
   confirmDialogConfig.value = {
     title: 'Clear All History',
     message: 'All variation history, ratings, and notes will be permanently deleted. This cannot be undone.',
@@ -662,7 +663,7 @@ const clearHistory = () => {
         variationHistory.value = []
         selectedVariations.value = []
         showNotification('History cleared', 'success')
-      } catch (error) {
+      } catch (error: unknown) {
         showNotification('Failed to clear history', 'error')
         console.error(error)
       }
@@ -671,7 +672,7 @@ const clearHistory = () => {
   showConfirmDialog.value = true
 }
 
-const exportComparison = () => {
+const exportComparison = (): void => {
   const dataStr = JSON.stringify(selectedVariations.value, null, 2)
   const dataBlob = new Blob([dataStr], { type: 'application/json' })
   const url = URL.createObjectURL(dataBlob)
@@ -683,21 +684,21 @@ const exportComparison = () => {
   showNotification('Comparison exported', 'success')
 }
 
-const viewFullImage = (variation) => {
+const viewFullImage = (variation: Variation): void => {
   fullImageVariation.value = variation
 }
 
-const getUniqueModels = () => {
+const getUniqueModels = (): string[] => {
   const models = new Set(selectedVariations.value.map(v => v.model))
   return Array.from(models)
 }
 
-const getUniqueResolutions = () => {
+const getUniqueResolutions = (): string[] => {
   const resolutions = new Set(selectedVariations.value.map(v => `${v.width}×${v.height}`))
   return Array.from(resolutions)
 }
 
-const formatDateTime = (date) => {
+const formatDateTime = (date: string | Date): string => {
   if (!date) return ''
   return new Date(date).toLocaleString('en-US', {
     month: 'short',
@@ -707,7 +708,7 @@ const formatDateTime = (date) => {
   })
 }
 
-const formatDate = (date) => {
+const formatDate = (date: string | Date): string => {
   if (!date) return ''
   return new Date(date).toLocaleDateString('en-US', {
     month: 'short',
@@ -716,11 +717,11 @@ const formatDate = (date) => {
   })
 }
 
-const formatTime = (date) => {
+const formatTime = (date: string | Date): string => {
   if (!date) return ''
   const now = new Date()
   const itemDate = new Date(date)
-  const diffMs = now - itemDate
+  const diffMs = now.getTime() - itemDate.getTime()
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
@@ -732,7 +733,7 @@ const formatTime = (date) => {
   return itemDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-const showNotification = (message, type = 'info') => {
+const showNotification = (message: string, type: string = 'info'): void => {
   notification.value = { message, type }
   setTimeout(() => {
     notification.value = null

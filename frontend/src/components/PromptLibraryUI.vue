@@ -325,28 +325,43 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { apiService } from '../services/api'
 import { samplePrompts } from '@/data/mock-data'
+import type { MockPrompt } from '@/data/mock-data'
 import ConfirmDialog from './ConfirmDialog.vue'
 import SkeletonLoader from './SkeletonLoader.vue'
+import type { Prompt, ConfirmDialogConfig, Notification } from '@/types'
 
-const savedPrompts = ref([])
-const searchQuery = ref('')
-const selectedTags = ref([])
-const viewMode = ref('grid')
-const isLoading = ref(false)
-const isSaving = ref(false)
-const showNewPromptForm = ref(false)
-const showShareModal = ref(false)
-const sharingPrompt = ref(null)
-const shareMode = ref('public')
-const copiedLink = ref(false)
-const editingPrompt = ref(null)
+interface FormData {
+  name: string
+  promptText: string
+  category: string
+  tags: string
+  isPublic: boolean
+}
 
-const showConfirmDialog = ref(false)
-const confirmDialogConfig = ref({
+interface FormErrors {
+  name?: string
+  promptText?: string
+}
+
+const savedPrompts = ref<Prompt[]>([])
+const searchQuery = ref<string>('')
+const selectedTags = ref<string[]>([])
+const viewMode = ref<'grid' | 'list'>('grid')
+const isLoading = ref<boolean>(false)
+const isSaving = ref<boolean>(false)
+const showNewPromptForm = ref<boolean>(false)
+const showShareModal = ref<boolean>(false)
+const sharingPrompt = ref<Prompt | null>(null)
+const shareMode = ref<'public' | 'link'>('public')
+const copiedLink = ref<boolean>(false)
+const editingPrompt = ref<Prompt | null>(null)
+
+const showConfirmDialog = ref<boolean>(false)
+const confirmDialogConfig = ref<ConfirmDialogConfig>({
   title: '',
   message: '',
   confirmText: 'Confirm',
@@ -355,7 +370,7 @@ const confirmDialogConfig = ref({
   onConfirm: () => {},
 })
 
-const formData = ref({
+const formData = ref<FormData>({
   name: '',
   promptText: '',
   category: '',
@@ -363,50 +378,50 @@ const formData = ref({
   isPublic: false,
 })
 
-const formErrors = ref({})
+const formErrors = ref<FormErrors>({})
 
-const notification = ref(null)
+const notification = ref<Notification | null>(null)
 
 // Computed properties
-const availableTags = computed(() => {
-  const tags = new Set()
-  savedPrompts.value.forEach(prompt => {
+const availableTags = computed((): string[] => {
+  const tags = new Set<string>()
+  savedPrompts.value.forEach((prompt: Prompt) => {
     if (prompt.tags) {
-      prompt.tags.forEach(tag => tags.add(tag))
+      prompt.tags.forEach((tag: string) => tags.add(tag))
     }
   })
   return Array.from(tags).sort()
 })
 
-const filteredPrompts = computed(() => {
-  return savedPrompts.value.filter(prompt => {
+const filteredPrompts = computed((): Prompt[] => {
+  return savedPrompts.value.filter((prompt: Prompt) => {
     const matchesSearch = !searchQuery.value ||
       prompt.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       prompt.promptText.toLowerCase().includes(searchQuery.value.toLowerCase())
-    
+
     const matchesTags = selectedTags.value.length === 0 ||
-      (prompt.tags && selectedTags.value.some(tag => prompt.tags.includes(tag)))
-    
+      (prompt.tags && selectedTags.value.some((tag: string) => prompt.tags.includes(tag)))
+
     return matchesSearch && matchesTags
   })
 })
 
 // Methods
-const loadPrompts = async () => {
+const loadPrompts = async (): Promise<void> => {
   isLoading.value = true
   try {
-    const response = await apiService.get('/prompts/library')
+    const response = await apiService.get<{ data: Prompt[] }>('/prompts/library')
     savedPrompts.value = response.data || []
-  } catch (error) {
+  } catch (error: unknown) {
     console.warn('API unavailable, using sample data')
-    savedPrompts.value = samplePrompts
+    savedPrompts.value = samplePrompts as Prompt[]
     showNotification('Showing sample prompts (API offline)', 'info')
   } finally {
     isLoading.value = false
   }
 }
 
-const savePrompt = async () => {
+const savePrompt = async (): Promise<void> => {
   // Validate form
   formErrors.value = {}
   if (!formData.value.name.trim()) {
@@ -423,11 +438,11 @@ const savePrompt = async () => {
 
   isSaving.value = true
   try {
-    const payload = {
+    const payload: { name: string; promptText: string; category: string; tags: string[]; isPublic: boolean } = {
       name: formData.value.name,
       promptText: formData.value.promptText,
       category: formData.value.category,
-      tags: formData.value.tags.split(',').map(t => t.trim()).filter(t => t),
+      tags: formData.value.tags.split(',').map((t: string) => t.trim()).filter((t: string) => t),
       isPublic: formData.value.isPublic,
     }
 
@@ -441,7 +456,7 @@ const savePrompt = async () => {
 
     closeForm()
     await loadPrompts()
-  } catch (error) {
+  } catch (error: unknown) {
     showNotification('Failed to save prompt', 'error')
     console.error(error)
   } finally {
@@ -449,7 +464,7 @@ const savePrompt = async () => {
   }
 }
 
-const editPrompt = (prompt) => {
+const editPrompt = (prompt: Prompt): void => {
   editingPrompt.value = prompt
   formData.value = {
     name: prompt.name,
@@ -461,19 +476,19 @@ const editPrompt = (prompt) => {
   showNewPromptForm.value = true
 }
 
-const deletePrompt = (promptId) => {
+const deletePrompt = (promptId: string): void => {
   confirmDialogConfig.value = {
     title: 'Delete Prompt',
     message: 'This prompt will be permanently deleted. This action cannot be undone.',
     confirmText: 'Delete',
     cancelText: 'Keep',
     destructive: true,
-    onConfirm: async () => {
+    onConfirm: async (): Promise<void> => {
       try {
         await apiService.delete(`/prompts/library/${promptId}`)
         showNotification('Prompt deleted successfully', 'success')
         await loadPrompts()
-      } catch (error) {
+      } catch (error: unknown) {
         showNotification('Failed to delete prompt', 'error')
         console.error(error)
       }
@@ -482,7 +497,7 @@ const deletePrompt = (promptId) => {
   showConfirmDialog.value = true
 }
 
-const duplicatePrompt = async (prompt) => {
+const duplicatePrompt = async (prompt: Prompt): Promise<void> => {
   editingPrompt.value = null
   formData.value = {
     name: `${prompt.name} (Copy)`,
@@ -494,7 +509,7 @@ const duplicatePrompt = async (prompt) => {
   showNewPromptForm.value = true
 }
 
-const usePrompt = (prompt) => {
+const usePrompt = (prompt: Prompt): void => {
   // Emit event to parent component with the selected prompt
   const event = new CustomEvent('prompt-selected', {
     detail: { prompt },
@@ -504,13 +519,13 @@ const usePrompt = (prompt) => {
   showNotification(`Using prompt: ${prompt.name}`, 'success')
 }
 
-const sharePrompt = (prompt) => {
+const sharePrompt = (prompt: Prompt): void => {
   sharingPrompt.value = prompt
   shareMode.value = 'public'
   showShareModal.value = true
 }
 
-const confirmShare = async () => {
+const confirmShare = async (): Promise<void> => {
   if (!sharingPrompt.value) return
 
   try {
@@ -523,19 +538,19 @@ const confirmShare = async () => {
     )
     showShareModal.value = false
     await loadPrompts()
-  } catch (error) {
+  } catch (error: unknown) {
     showNotification('Failed to share prompt', 'error')
     console.error(error)
   }
 }
 
-const getShareLink = () => {
+const getShareLink = (): string => {
   if (!sharingPrompt.value) return ''
   return `${window.location.origin}/share/prompt/${sharingPrompt.value.id}`
 }
 
-const copyShareLink = () => {
-  const link = getShareLink()
+const copyShareLink = (): void => {
+  const link: string = getShareLink()
   navigator.clipboard.writeText(link)
   copiedLink.value = true
   setTimeout(() => {
@@ -543,11 +558,11 @@ const copyShareLink = () => {
   }, 2000)
 }
 
-const exportLibrary = () => {
-  const dataStr = JSON.stringify(filteredPrompts.value, null, 2)
-  const dataBlob = new Blob([dataStr], { type: 'application/json' })
-  const url = URL.createObjectURL(dataBlob)
-  const link = document.createElement('a')
+const exportLibrary = (): void => {
+  const dataStr: string = JSON.stringify(filteredPrompts.value, null, 2)
+  const dataBlob: Blob = new Blob([dataStr], { type: 'application/json' })
+  const url: string = URL.createObjectURL(dataBlob)
+  const link: HTMLAnchorElement = document.createElement('a')
   link.href = url
   link.download = `prompt-library-${new Date().toISOString().split('T')[0]}.json`
   link.click()
@@ -555,7 +570,7 @@ const exportLibrary = () => {
   showNotification('Library exported successfully', 'success')
 }
 
-const closeForm = () => {
+const closeForm = (): void => {
   showNewPromptForm.value = false
   editingPrompt.value = null
   formData.value = {
@@ -568,12 +583,12 @@ const closeForm = () => {
   formErrors.value = {}
 }
 
-const toggleView = () => {
+const toggleView = (): void => {
   viewMode.value = viewMode.value === 'grid' ? 'list' : 'grid'
 }
 
-const toggleTagFilter = (tag) => {
-  const index = selectedTags.value.indexOf(tag)
+const toggleTagFilter = (tag: string): void => {
+  const index: number = selectedTags.value.indexOf(tag)
   if (index > -1) {
     selectedTags.value.splice(index, 1)
   } else {
@@ -581,7 +596,7 @@ const toggleTagFilter = (tag) => {
   }
 }
 
-const formatDate = (date) => {
+const formatDate = (date: string | undefined): string => {
   if (!date) return ''
   return new Date(date).toLocaleDateString('en-US', {
     month: 'short',
@@ -590,7 +605,7 @@ const formatDate = (date) => {
   })
 }
 
-const showNotification = (message, type = 'info') => {
+const showNotification = (message: string, type: string = 'info'): void => {
   notification.value = { message, type }
   setTimeout(() => {
     notification.value = null

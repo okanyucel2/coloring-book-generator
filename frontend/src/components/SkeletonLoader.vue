@@ -18,13 +18,11 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  variant: {
-    type: String,
-    default: 'card',
-    validator: (v) => ['card', 'row'].includes(v),
-  },
+<script setup lang="ts">
+withDefaults(defineProps<{
+  variant?: 'card' | 'row'
+}>(), {
+  variant: 'card',
 })
 </script>
 
