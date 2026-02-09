@@ -129,6 +129,72 @@
   --color-selected-bg: #f0f8f4;
   --color-image-backdrop: #000;
   --color-header-accent: #2c3e50;
+
+  /* === THEME-AWARE CARDS & CONTENT (Dark Mode Defaults) === */
+  --color-card-bg: #1e2a3a;
+  --color-card-bg-secondary: #243244;
+  --color-card-border: rgba(255, 255, 255, 0.12);
+  --color-card-text: #e0e0e0;
+  --color-card-text-secondary: #a0aec0;
+  --color-card-text-muted: #718096;
+  --color-card-heading: #f0f0f0;
+
+  /* Content container backgrounds for dark mode */
+  --color-content-container-bg-start: #1a2332;
+  --color-content-container-bg-end: #162030;
+
+  /* Comparison heading text */
+  --color-heading-on-shell: #f0f0f0;
+
+  /* Input/form fields */
+  --color-input-bg: #243244;
+  --color-input-border: rgba(255, 255, 255, 0.15);
+  --color-input-text: #e0e0e0;
+  --color-input-placeholder: #718096;
+
+  /* Tag/badge contrast for dark mode */
+  --color-tag-bg: rgba(76, 175, 80, 0.15);
+  --color-tag-text: #81c784;
+  --color-tag-border: rgba(76, 175, 80, 0.3);
+  --color-filter-tag-bg: rgba(255, 255, 255, 0.08);
+  --color-filter-tag-border: rgba(255, 255, 255, 0.15);
+  --color-filter-tag-text: #a0aec0;
+  --color-filter-tag-active-bg: var(--color-success);
+  --color-filter-tag-active-text: #fff;
+
+  /* Button secondary in dark mode */
+  --color-btn-secondary-bg: rgba(255, 255, 255, 0.08);
+  --color-btn-secondary-border: rgba(255, 255, 255, 0.15);
+  --color-btn-secondary-text: #e0e0e0;
+  --color-btn-secondary-hover-bg: rgba(255, 255, 255, 0.15);
+
+  /* Footer */
+  --color-footer-bg: rgba(0, 0, 0, 0.3);
+
+  /* Active tab in dark mode */
+  --color-tab-active-text: #fff;
+
+  /* Badge overrides for dark mode readability */
+  --color-badge-bg: rgba(255, 255, 255, 0.1);
+  --color-badge-text: #c0c8d4;
+  --color-badge-category-bg: rgba(33, 150, 243, 0.15);
+  --color-badge-category-text: #64b5f6;
+  --color-badge-date-bg: rgba(156, 39, 176, 0.15);
+  --color-badge-date-text: #ce93d8;
+  --color-badge-seed-bg: rgba(33, 150, 243, 0.15);
+  --color-badge-seed-text: #64b5f6;
+  --color-badge-resolution-bg: rgba(156, 39, 176, 0.15);
+  --color-badge-resolution-text: #ce93d8;
+  --color-badge-rating-bg: rgba(255, 152, 0, 0.15);
+  --color-badge-rating-text: #ffb74d;
+
+  /* Card footer / subtle sections */
+  --color-card-footer-bg: rgba(255, 255, 255, 0.03);
+  --color-card-divider: rgba(255, 255, 255, 0.08);
+
+  /* Analysis cards */
+  --color-analysis-bg: #1e2a3a;
+  --color-analysis-border: rgba(255, 255, 255, 0.1);
 }
 
 /* ========================================
@@ -136,14 +202,14 @@
    Applied via [data-theme="light"] on <html>
    ======================================== */
 [data-theme="light"] {
-  /* Shell becomes light */
-  --color-shell-bg-start: #f5f7fa;
-  --color-shell-bg-mid: #e8ecf1;
-  --color-shell-bg-end: #dce3ed;
-  --color-shell-surface: rgba(0, 0, 0, 0.03);
-  --color-shell-surface-hover: rgba(0, 0, 0, 0.06);
-  --color-shell-border: rgba(0, 0, 0, 0.1);
-  --color-shell-border-hover: rgba(0, 0, 0, 0.2);
+  /* Shell becomes light — more opaque header/footer */
+  --color-shell-bg-start: #f0f2f5;
+  --color-shell-bg-mid: #e4e8ee;
+  --color-shell-bg-end: #d8dfe8;
+  --color-shell-surface: rgba(255, 255, 255, 0.85);
+  --color-shell-surface-hover: rgba(255, 255, 255, 0.95);
+  --color-shell-border: rgba(0, 0, 0, 0.12);
+  --color-shell-border-hover: rgba(0, 0, 0, 0.25);
   --color-shell-text: #1a1a2e;
   --color-shell-text-muted: #4a5568;
   --color-shell-text-subtle: #718096;
@@ -165,4 +231,70 @@
   --color-selected-bg: #e8f5e9;
   --color-image-backdrop: #1a1a2e;
   --color-header-accent: #37474f;
+
+  /* === LIGHT MODE CARD & CONTENT OVERRIDES === */
+  --color-card-bg: #ffffff;
+  --color-card-bg-secondary: #fafafa;
+  --color-card-border: #e0e0e0;
+  --color-card-text: #333333;
+  --color-card-text-secondary: #666666;
+  --color-card-text-muted: #999999;
+  --color-card-heading: #1a1a2e;
+
+  /* Content container backgrounds for light mode */
+  --color-content-container-bg-start: #f5f7fa;
+  --color-content-container-bg-end: #e8ecf1;
+
+  /* Input/form fields */
+  --color-input-bg: #ffffff;
+  --color-input-border: #d0d5dd;
+  --color-input-text: #333333;
+  --color-input-placeholder: #999999;
+
+  /* Tags */
+  --color-tag-bg: #e8f5e9;
+  --color-tag-text: #2e7d32;
+  --color-tag-border: #a5d6a7;
+  --color-filter-tag-bg: #f0f0f0;
+  --color-filter-tag-border: #e0e0e0;
+  --color-filter-tag-text: #555555;
+  --color-filter-tag-active-bg: var(--color-success);
+  --color-filter-tag-active-text: #ffffff;
+
+  /* Button secondary */
+  --color-btn-secondary-bg: #f0f0f0;
+  --color-btn-secondary-border: #e0e0e0;
+  --color-btn-secondary-text: #333333;
+  --color-btn-secondary-hover-bg: #e0e0e0;
+
+  /* Footer */
+  --color-footer-bg: rgba(0, 0, 0, 0.05);
+
+  /* Active tab */
+  --color-tab-active-text: #1a1a2e;
+
+  /* Badges */
+  --color-badge-bg: #f0f0f0;
+  --color-badge-text: #666666;
+  --color-badge-category-bg: #e3f2fd;
+  --color-badge-category-text: #1565c0;
+  --color-badge-date-bg: #ede7f6;
+  --color-badge-date-text: #4a148c;
+  --color-badge-seed-bg: #e3f2fd;
+  --color-badge-seed-text: #0d47a1;
+  --color-badge-resolution-bg: #ede7f6;
+  --color-badge-resolution-text: #4a148c;
+  --color-badge-rating-bg: #fff3e0;
+  --color-badge-rating-text: #e65100;
+
+  /* Card footer */
+  --color-card-footer-bg: #fafafa;
+  --color-card-divider: #eeeeee;
+
+  /* Analysis */
+  --color-analysis-bg: #fafafa;
+  --color-analysis-border: #e0e0e0;
+
+  /* Comparison heading */
+  --color-heading-on-shell: #1a1a2e;
 }

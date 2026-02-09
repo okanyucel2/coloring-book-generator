@@ -334,7 +334,7 @@ html, body {
 .nav-tab.active {
   background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
   border-color: var(--color-brand-start);
-  color: var(--color-text-inverted);
+  color: var(--color-tab-active-text);
 }
 
 .tab-icon {
@@ -404,7 +404,7 @@ html, body {
 
 .comparison-controls-header h2 {
   font-size: 1.8rem;
-  color: #fff;
+  color: var(--color-heading-on-shell);
   margin-bottom: var(--space-2);
 }
 
@@ -523,7 +523,7 @@ html, body {
   padding: var(--space-6) var(--space-8);
   text-align: center;
   border-top: 1px solid var(--color-shell-border);
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-footer-bg);
 }
 
 .app-footer p {

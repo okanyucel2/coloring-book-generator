@@ -623,7 +623,7 @@ onMounted(() => {
   padding: var(--space-8);
   max-width: 1400px;
   margin: 0 auto;
-  background: linear-gradient(135deg, var(--color-content-bg-start) 0%, var(--color-content-bg-end) 100%);
+  background: linear-gradient(135deg, var(--color-content-container-bg-start) 0%, var(--color-content-container-bg-end) 100%);
   min-height: 100vh;
 }
 
@@ -633,16 +633,17 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--space-8);
-  background: var(--color-surface-primary);
+  background: var(--color-card-bg);
   padding: var(--space-6);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-card-border);
 }
 
 .library-header h2 {
   margin: 0;
   font-size: 1.8rem;
-  color: var(--color-text-primary);
+  color: var(--color-card-heading);
 }
 
 .header-actions {
@@ -653,20 +654,23 @@ onMounted(() => {
 /* Controls */
 .library-controls {
   margin-bottom: var(--space-8);
-  background: var(--color-surface-primary);
+  background: var(--color-card-bg);
   padding: var(--space-6);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-card-border);
 }
 
 .search-input {
   width: 100%;
   padding: var(--space-3) var(--space-4);
-  border: 2px solid var(--color-border-light);
+  border: 2px solid var(--color-input-border);
   border-radius: var(--radius-lg);
   font-size: var(--text-base);
   margin-bottom: var(--space-4);
   transition: all var(--transition-slow) ease;
+  background: var(--color-input-bg);
+  color: var(--color-input-text);
 }
 
 .search-input:focus {
@@ -683,22 +687,24 @@ onMounted(() => {
 
 .filter-tag {
   padding: var(--space-2) var(--space-4);
-  background: var(--color-surface-subtle);
-  border: 2px solid var(--color-border-light);
+  background: var(--color-filter-tag-bg);
+  border: 2px solid var(--color-filter-tag-border);
   border-radius: var(--radius-pill);
   cursor: pointer;
   transition: all var(--transition-slow) ease;
   font-size: 0.9rem;
+  color: var(--color-filter-tag-text);
 }
 
 .filter-tag:hover {
   border-color: var(--color-success);
-  background: var(--color-success-light);
+  background: var(--color-tag-bg);
+  color: var(--color-tag-text);
 }
 
 .filter-tag.active {
-  background: var(--color-success);
-  color: var(--color-surface-primary);
+  background: var(--color-filter-tag-active-bg);
+  color: var(--color-filter-tag-active-text);
   border-color: var(--color-success);
 }
 
@@ -718,7 +724,8 @@ onMounted(() => {
 
 /* Prompt Cards */
 .prompt-card {
-  background: var(--color-surface-primary);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
   overflow: hidden;
@@ -737,13 +744,13 @@ onMounted(() => {
   justify-content: space-between;
   align-items: flex-start;
   padding: var(--space-4);
-  border-bottom: 1px solid var(--color-surface-subtle);
+  border-bottom: 1px solid var(--color-card-divider);
 }
 
 .card-header h4 {
   margin: 0;
   font-size: 1.1rem;
-  color: var(--color-text-primary);
+  color: var(--color-card-heading);
   flex: 1;
 }
 
@@ -783,7 +790,7 @@ onMounted(() => {
 
 .prompt-preview {
   margin: 0 0 var(--space-3) 0;
-  color: var(--color-text-secondary);
+  color: var(--color-card-text-secondary);
   line-height: 1.5;
   font-size: 0.95rem;
 }
@@ -798,20 +805,20 @@ onMounted(() => {
 .badge {
   display: inline-block;
   padding: var(--space-1) var(--space-3);
-  background: var(--color-surface-subtle);
+  background: var(--color-badge-bg);
   border-radius: var(--radius-xl);
   font-size: 0.85rem;
-  color: var(--color-text-secondary);
+  color: var(--color-badge-text);
 }
 
 .badge.category {
-  background: var(--color-primary-light);
-  color: var(--color-primary-hover);
+  background: var(--color-badge-category-bg);
+  color: var(--color-badge-category-text);
 }
 
 .badge.date {
-  background: var(--color-badge-purple-bg);
-  color: var(--color-badge-purple-text);
+  background: var(--color-badge-date-bg);
+  color: var(--color-badge-date-text);
 }
 
 .card-tags {
@@ -822,27 +829,29 @@ onMounted(() => {
 
 .tag {
   font-size: 0.85rem;
-  color: var(--color-success);
-  background: var(--color-success-light);
+  color: var(--color-tag-text);
+  background: var(--color-tag-bg);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
+  border: 1px solid var(--color-tag-border);
 }
 
 .card-footer {
   padding: var(--space-4);
-  border-top: 1px solid var(--color-surface-subtle);
-  background: var(--color-surface-secondary);
+  border-top: 1px solid var(--color-card-divider);
+  background: var(--color-card-footer-bg);
 }
 
 /* Prompt Items (List View) */
 .prompt-item {
-  background: var(--color-surface-primary);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
   transition: all var(--transition-slow) ease;
 }
 
@@ -856,12 +865,12 @@ onMounted(() => {
 
 .item-header h4 {
   margin: 0 0 var(--space-2) 0;
-  color: var(--color-text-primary);
+  color: var(--color-card-heading);
 }
 
 .item-preview {
   margin: 0;
-  color: var(--color-text-tertiary);
+  color: var(--color-card-text-muted);
   font-size: 0.9rem;
 }
 
@@ -881,7 +890,8 @@ onMounted(() => {
 .empty-state {
   text-align: center;
   padding: 4rem var(--space-8);
-  background: var(--color-surface-primary);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-md);
 }
@@ -893,12 +903,12 @@ onMounted(() => {
 
 .empty-state h3 {
   margin: 0 0 var(--space-2) 0;
-  color: var(--color-text-primary);
+  color: var(--color-card-heading);
 }
 
 .empty-state p {
   margin: 0;
-  color: var(--color-text-tertiary);
+  color: var(--color-card-text-muted);
 }
 
 /* Buttons */
@@ -931,13 +941,13 @@ onMounted(() => {
 }
 
 .btn-secondary {
-  background: var(--color-surface-subtle);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-btn-secondary-text);
+  border: 1px solid var(--color-btn-secondary-border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--color-border-light);
+  background: var(--color-btn-secondary-hover-bg);
 }
 
 .btn-danger {
@@ -973,7 +983,8 @@ onMounted(() => {
 }
 
 .modal-content {
-  background: var(--color-surface-primary);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
   border-radius: var(--radius-xl);
   padding: var(--space-8);
   max-width: 500px;
@@ -987,7 +998,7 @@ onMounted(() => {
 .prompt-form h3,
 .share-modal h3 {
   margin-top: 0;
-  color: var(--color-text-primary);
+  color: var(--color-card-heading);
 }
 
 /* Form */
@@ -999,7 +1010,7 @@ onMounted(() => {
   display: block;
   margin-bottom: var(--space-2);
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--color-card-text);
 }
 
 .form-input,
@@ -1007,11 +1018,13 @@ onMounted(() => {
 .form-select {
   width: 100%;
   padding: var(--space-3);
-  border: 2px solid var(--color-border-light);
+  border: 2px solid var(--color-input-border);
   border-radius: var(--radius-lg);
   font-size: var(--text-base);
   font-family: inherit;
   transition: all var(--transition-slow) ease;
+  background: var(--color-input-bg);
+  color: var(--color-input-text);
 }
 
 .form-input:focus,
@@ -1029,7 +1042,7 @@ onMounted(() => {
 
 .char-count {
   font-size: 0.85rem;
-  color: var(--color-text-tertiary);
+  color: var(--color-card-text-muted);
   margin-top: var(--space-2);
 }
 
@@ -1043,7 +1056,7 @@ onMounted(() => {
 .help-text {
   margin: var(--space-2) 0 0 0;
   font-size: 0.85rem;
-  color: var(--color-text-tertiary);
+  color: var(--color-card-text-muted);
 }
 
 .form-row {
@@ -1058,7 +1071,7 @@ onMounted(() => {
   justify-content: flex-end;
   margin-top: var(--space-8);
   padding-top: var(--space-6);
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--color-card-divider);
 }
 
 /* Share Modal */
@@ -1098,10 +1111,11 @@ onMounted(() => {
 .share-link-input {
   flex: 1;
   padding: var(--space-3);
-  border: 2px solid var(--color-border-light);
+  border: 2px solid var(--color-input-border);
   border-radius: var(--radius-lg);
   font-size: 0.9rem;
-  background: var(--color-surface-tertiary);
+  background: var(--color-input-bg);
+  color: var(--color-input-text);
 }
 
 /* Toast */
