@@ -12,7 +12,10 @@
     "test:coverage": "vitest --coverage",
     "typecheck": "vue-tsc --noEmit",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "storybook:build": "storybook build",
+    "storycap": "storycap http://localhost:6007 -o __screenshots__ --serverCmd '' || true",
+    "visual-regression": "http-server storybook-static -p 6007 --silent & sleep 2 && pnpm storycap && kill %1 || true"
   },
   "dependencies": {
     "axios": "^1.6.0",
@@ -21,6 +24,7 @@
   "devDependencies": {
     "@genesis/playwright-config": "workspace:*",
     "@genesis/tsconfig": "workspace:*",
+    "@genesis/visual-regression": "workspace:*",
     "@playwright/test": "^1.58.0",
     "@storybook/addon-a11y": "^10.2.0",
     "@storybook/addon-docs": "^10.2.0",
@@ -30,11 +34,14 @@
     "@vitest/ui": "^1.0.0",
     "@vue/test-utils": "^2.4.1",
     "happy-dom": "^12.10.3",
+    "http-server": "^14.1.1",
     "jsdom": "^23.2.0",
     "storybook": "^10.2.0",
+    "storycap": "^5.0.1",
     "typescript": "^5.3.0",
     "vite": "^5.0.0",
     "vitest": "^1.0.0",
-    "vue-tsc": "^2.2.0"
+    "vue-tsc": "^2.2.0",
+    "wait-on": "^9.0.3"
   }
 }

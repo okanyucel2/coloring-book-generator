@@ -1,7 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import type { StorybookConfig } from '@storybook/vue3-vite'
-import vue from '@vitejs/plugin-vue'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -18,8 +17,7 @@ const config: StorybookConfig = {
   },
 
   viteFinal: async (config) => {
-    config.plugins = config.plugins || []
-    config.plugins.push(vue())
+    // Note: Do NOT add vue() plugin here — @storybook/vue3-vite already includes it
     config.resolve = config.resolve || {}
     config.resolve.alias = {
       ...config.resolve.alias,
