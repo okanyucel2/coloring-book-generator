@@ -53,7 +53,7 @@ defineExpose({ setModelOutput, models })
 
 <style scoped>
 .comparison-layout {
-  padding: 2rem;
+  padding: var(--space-8);
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -61,21 +61,21 @@ defineExpose({ setModelOutput, models })
 .comparison-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
-  margin-top: 2rem;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
 }
 
 .model-column {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  background: #f9f9f9;
+  background: var(--color-surface-tertiary);
 }
 
 .model-header {
   background: #2c3e50;
   color: white;
-  padding: 1rem;
+  padding: var(--space-4);
   text-align: center;
 }
 
@@ -85,7 +85,7 @@ defineExpose({ setModelOutput, models })
 }
 
 .model-output {
-  padding: 1rem;
+  padding: var(--space-4);
   min-height: 300px;
   display: flex;
   align-items: center;
@@ -95,19 +95,31 @@ defineExpose({ setModelOutput, models })
 .output-image {
   max-width: 100%;
   max-height: 400px;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
 }
 
 .model-placeholder {
-  color: #999;
+  color: var(--color-text-tertiary);
   text-align: center;
-  padding: 2rem;
+  padding: var(--space-8);
   font-style: italic;
 }
 
 h1 {
   color: #2c3e50;
-  margin: 0 0 1rem 0;
+  margin: 0 0 var(--space-4) 0;
+}
+
+@media (max-width: 1024px) {
+  .comparison-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .comparison-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

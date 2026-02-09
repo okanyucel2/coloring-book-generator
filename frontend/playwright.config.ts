@@ -9,4 +9,6 @@ import { createPlaywrightConfig } from '@genesis/playwright-config'
 
 export default createPlaywrightConfig({
   projectSlug: 'project001',
+  testDir: './e2e',
+  timeout: 10000,
 })
