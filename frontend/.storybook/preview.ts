@@ -1,43 +1,71 @@
-import type { Preview } from '@storybook/vue3-vite'
+/**
+ * Storybook Preview Configuration
+ *
+ * Custom dark mode decorator that matches our data-theme="light"
+ * attribute pattern (default = dark, no attribute).
+ */
+import type { Preview } from '@storybook/vue3'
+import '../src/assets/design-tokens.css'
 
 const preview: Preview = {
+  decorators: [
+    // Theme decorator: sets data-theme attribute on <html>
+    (story, context) => {
+      const theme = context.globals?.theme || 'dark'
+      if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light')
+      } else {
+        document.documentElement.removeAttribute('data-theme')
+      }
+      return story()
+    },
+  ],
   parameters: {
-    controls: {
-      matchers: {
-        color: /(background|color)$/i,
-        date: /Date$/i,
-      },
-    },
-    backgrounds: {
-      options: {
-        light: { name: 'Light', value: '#f5f7fa' },
-        dark: { name: 'Dark (App Shell)', value: '#1a1a2e' },
-        white: { name: 'White', value: '#ffffff' },
-      },
-    },
     viewport: {
       viewports: {
-        mobile: { name: 'Mobile', styles: { width: '375px', height: '667px' } },
-        tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } },
-        desktop: { name: 'Desktop', styles: { width: '1280px', height: '720px' } },
-        wide: { name: 'Wide', styles: { width: '1920px', height: '1080px' } },
+        mobile: { name: 'Mobile (360x640)', styles: { width: '360px', height: '640px' } },
+        tablet: { name: 'Tablet (768x1024)', styles: { width: '768px', height: '1024px' } },
+        desktop: { name: 'Desktop (1280x720)', styles: { width: '1280px', height: '720px' } },
+        desktopWide: { name: 'Desktop Wide (1920x1080)', styles: { width: '1920px', height: '1080px' } },
+      },
+      defaultViewport: 'desktop',
+    },
+    backgrounds: {
+      default: 'Dark Shell',
+      values: [
+        { name: 'Dark Shell', value: '#1a1a2e' },
+        { name: 'Light Shell', value: '#f0f2f5' },
+        { name: 'White', value: '#ffffff' },
+      ],
+    },
+    a11y: {
+      config: {
+        rules: [
+          { id: 'color-contrast', enabled: true },
+          { id: 'landmark-one-main', enabled: false },
+          { id: 'page-has-heading-one', enabled: false },
+          { id: 'region', enabled: false },
+        ],
       },
     },
   },
-
-  decorators: [
-    (story, context) => {
-      const bg = context.globals.backgrounds?.value
-      const isDark = bg === '#1a1a2e'
-      const style = isDark
-        ? 'background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #e0e0e0; min-height: 100vh; padding: 2rem;'
-        : 'padding: 2rem;'
-      return {
-        components: { story },
-        template: `<div style="${style}"><story /></div>`,
-      }
+  globalTypes: {
+    theme: {
+      name: 'Theme',
+      description: 'Toggle dark/light mode',
+      defaultValue: 'dark',
+      toolbar: {
+        icon: 'circlehollow',
+        items: [
+          { value: 'dark', icon: 'moon', title: 'Dark' },
+          { value: 'light', icon: 'sun', title: 'Light' },
+        ],
+        showName: true,
+        dynamicTitle: true,
+      },
     },
-  ],
+  },
+  tags: ['autodocs'],
 }
 
 export default preview
