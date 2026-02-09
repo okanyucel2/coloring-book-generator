@@ -119,25 +119,9 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Build Storybook
-        id: build_storybook
-        continue-on-error: true
-        run: pnpm storybook:build 2>&1 | tee storybook-build.log
+        run: pnpm storybook:build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-
-      - name: Upload build log on failure
-        if: steps.build_storybook.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: storybook-build-log
-          path: frontend/storybook-build.log
-
-      - name: Fail if build failed
-        if: steps.build_storybook.outcome == 'failure'
-        run: |
-          echo "::error::Storybook build failed. See storybook-build-log artifact for details."
-          tail -50 storybook-build.log
-          exit 1
 
       - name: Capture Screenshots with Storycap
         run: |
