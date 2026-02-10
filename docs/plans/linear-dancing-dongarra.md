@@ -1,183 +1,90 @@
-# Etsy OAuth Completion — Genesis Infrastructure Reuse Plan
+# Google Login — Frontend Integration Plan
 
 ## Context
 
-Etsy OAuth integration is ~40% complete. Backend PKCE flow works, frontend UI exists, SEO engine generates metadata. But the flow is broken end-to-end: the callback doesn't signal the frontend, tokens are in-memory (lost on restart), and shop_id is hardcoded to 0.
+Backend Google OAuth is **fully implemented** via `auth-fastapi` package but the project001 frontend has **zero auth UI**. User requested: "google login'i ekle, frontend'e buton koy."
 
-Genesis already has production-grade auth infrastructure:
-- `DbProviderTokenManager` — encrypted token CRUD with auto-refresh (`provider_token_service.py`)
-- `TokenEncryption` — Fernet AES for tokens at rest (`packages/auth-core`)
-- `ProviderToken` model — multi-provider token storage with `provider_metadata` JSON column
-- Google OAuth callback pattern — fragment-based redirect to frontend (`packages/auth-fastapi/router.py:196-213`)
-
-**Goal:** Wire existing Genesis infrastructure into the Etsy OAuth flow to make it production-ready.
-
----
-
-## Architecture: Before vs After
-
-```
-BEFORE (broken):
-  Frontend → window.open(etsy) → Backend callback → JSON response → popup stuck
-  Tokens: in-memory singleton → lost on restart
-  shop_id: hardcoded 0
-
-AFTER:
-  Frontend → window.open(etsy) → Backend callback → HTML page → postMessage → popup closes
-  Tokens: DbProviderTokenManager → encrypted in ProviderToken table → survive restarts
-  shop_id: fetched via get_me() after auth → stored in provider_metadata
-```
-
----
-
-## Genesis Reuse Map
-
-| Genesis Component | File | Reuse For |
-|-------------------|------|-----------|
-| `DbProviderTokenManager` | `api/provider_token_service.py` | Store/retrieve/refresh Etsy tokens |
-| `TokenEncryption` | `packages/auth-core/encryption.py` | Encrypt tokens before DB storage |
-| `ProviderToken` model | `api/models.py:99-114` | DB table (already exists, `provider="etsy"`) |
-| Callback redirect pattern | `packages/auth-fastapi/router.py:196-213` | postMessage-based popup signal |
-| `_provider_token_manager` | `api/app.py:59-62` | Already instantiated in app startup |
-
----
-
-## Wave Plan
-
-### Wave 1: Backend — Token Persistence + Callback Redirect
-
-**Problem:** Tokens in-memory, callback returns JSON (popup stuck).
-
-**File: `src/coloring_book/api/etsy_routes.py`**
-
-1. **Import & inject `DbProviderTokenManager`** via `get_provider_token_manager()` from `app.py`:
-   - Remove global `_etsy_state` variable
-   - Add state storage per-request (use a simple dict keyed by state value, with TTL)
-
-2. **Rewrite `/callback` endpoint** (lines 114-151):
-   - Change from `POST` (JSON body) to `GET` (query params) — Etsy redirects via GET with `?code=X&state=Y`
-   - After `exchange_code()`: store tokens via `DbProviderTokenManager.store_tokens(user_id="default", provider="etsy", ...)`
-   - After token storage: call `client.get_me()` to fetch shop info, store `shop_id` in `provider_metadata`
-   - Return an `HTMLResponse` that sends `postMessage` to opener and closes itself:
-   ```python
-   from fastapi.responses import HTMLResponse
-   html = """<html><body><script>
-     window.opener.postMessage({type:"etsy-oauth-complete",success:true,shopId:SHOP_ID},"*");
-     window.close();
-   </script></body></html>"""
-   return HTMLResponse(content=html)
-   ```
-
-3. **Rewrite `/status` endpoint** (lines 153-163):
-   - Check `DbProviderTokenManager.get_tokens("default", "etsy")` instead of in-memory client
-   - Return `shop_id` from `provider_metadata`
-
-4. **Rewrite `/disconnect` endpoint** (lines 166-171):
-   - Call `DbProviderTokenManager.delete_tokens("default", "etsy")`
-
-5. **Update publish flow** (lines 204-285):
-   - Load tokens from DB before publishing
-   - Set them on the EtsyClient instance
-   - Use `refresh_if_expired()` for auto-refresh
-
-6. **Fix state parameter race condition** (line 31):
-   - Replace global `_etsy_state` with a dict `_pending_states: dict[str, float]` (state → timestamp)
-   - Clean up expired states (>10 min) on each auth-url request
-
-**File: `src/coloring_book/api/app.py`**
-- Ensure `_provider_token_manager` is available even without Google OAuth (currently conditional on Google env vars)
-- Extract encryption setup to work independently of Google auth
-
-### Wave 2: Frontend — OAuth Window Communication + Shop ID
-
-**File: `frontend/src/components/EtsyPublisher.vue`**
-
-1. **Add `postMessage` listener** for OAuth completion:
-   ```typescript
-   onMounted(() => {
-     window.addEventListener('message', handleOAuthMessage)
-     checkConnection()
-   })
-   onUnmounted(() => {
-     window.removeEventListener('message', handleOAuthMessage)
-   })
-   function handleOAuthMessage(event: MessageEvent) {
-     if (event.data?.type === 'etsy-oauth-complete') {
-       isConnected.value = event.data.success
-       shopId.value = event.data.shopId
-       connecting.value = false
-     }
-   }
-   ```
-
-2. **Fix `connectEtsy()`** (lines 149-160):
-   - Keep `connecting.value = true` until `postMessage` arrives (don't set false in finally)
-   - Add 5-minute timeout fallback
-
-3. **Use real `shop_id`** (line 195):
-   - Store from postMessage or fetch from `/etsy/status`
-   - Replace hardcoded `shop_id: 0`
-
-4. **Add connection indicator** with shop name:
-   - Show "Connected to Shop #12345" when authenticated
-
-### Wave 3: Make Token Manager Available Without Google Auth
-
-**File: `src/coloring_book/api/app.py`** (lines 34-78)
-
-Currently `DbProviderTokenManager` is only created when Google OAuth env vars are set. Etsy needs it independently.
-
-- Extract token manager initialization to a separate block:
-  ```python
-  # Provider token encryption (needed for Etsy even without Google auth)
-  _provider_key = os.environ.get("PROVIDER_TOKEN_KEY", "")
-  if not _provider_key:
-      _provider_key = TokenEncryption.generate_key()
-  _token_encryption = TokenEncryption(_provider_key)
-  _provider_token_manager = DbProviderTokenManager(
-      encryption=_token_encryption,
-      session_factory=async_session,
-  )
+**Backend state (ready):**
+- Auth router mounted at `/auth` when `JWT_SECRET` (>=32 chars) + `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` are set
+- `GET /auth/login/google` → redirects to Google consent screen
+- `GET /auth/callback/google` → exchanges code, creates/finds user, issues JWT, redirects to:
   ```
-- Move this BEFORE the Google OAuth conditional block
-- `get_provider_token_manager()` returns it unconditionally
+  {FRONTEND_URL}#oauth-callback&access_token=...&refresh_token=...&expires_in=...&user={json}
+  ```
+- `GET /auth/me` → returns current user (requires Bearer token)
+- `POST /auth/refresh` → refresh access token
 
-### Wave 4: Tests
-
-**File: `tests/test_etsy_oauth_flow.py`** (NEW)
-
-Backend tests:
-- `test_callback_returns_html_response` — verify HTMLResponse with postMessage script
-- `test_callback_stores_tokens_in_db` — verify ProviderToken row created
-- `test_status_reads_from_db` — verify status uses DB, not in-memory
-- `test_disconnect_removes_db_tokens` — verify deletion
-- `test_tokens_survive_client_recreation` — simulate restart
-- `test_state_race_condition` — two concurrent auth flows don't interfere
-
-Frontend E2E (Playwright):
-- `test_oauth_popup_opens` — verify window.open called
-- `test_postmessage_closes_popup` — mock postMessage, verify connected state
-- `test_shop_id_displayed` — verify shop ID from status
+**Frontend state (nothing):**
+- Simple tab-based SPA (`App.vue`), no router, no Pinia, no auth state
+- `apiService` has `setAuthToken(token)` / `clearAuthToken()` methods
+- Vite proxy: port 20159 → backend 10159
 
 ---
 
-## Files Summary
+## Implementation
+
+### Step 1: Add auth composable — `frontend/src/composables/useAuth.ts`
+
+Lightweight reactive auth state (no Pinia needed for this simple app):
+
+```typescript
+// Reactive state
+const user = ref<User | null>(null)
+const accessToken = ref<string | null>(null)
+const refreshToken = ref<string | null>(null)
+const isAuthenticated = computed(() => !!accessToken.value)
+
+// Functions:
+// - initAuth(): check localStorage for saved tokens, set on apiService
+// - handleOAuthCallback(): parse hash fragment, extract tokens/user, save to localStorage
+// - loginWithGoogle(): window.location.href = '/auth/login/google'
+// - logout(): clear tokens from localStorage + apiService + state
+// - refreshAccessToken(): POST /auth/refresh with refresh_token
+```
+
+localStorage keys: `cb_access_token`, `cb_refresh_token`, `cb_user`
+
+### Step 2: Parse OAuth hash on app load — `frontend/src/App.vue`
+
+In `onMounted`:
+1. Check if `window.location.hash` contains `oauth-callback`
+2. If yes → call `handleOAuthCallback()` → strip hash from URL
+3. Otherwise → call `initAuth()` to restore saved session
+
+### Step 3: Add Login/User UI to header — `frontend/src/App.vue`
+
+In the existing header (right side, next to theme toggle):
+- **Not authenticated:** "Login with Google" button
+- **Authenticated:** User avatar/name + "Logout" button
+
+Minimal styling consistent with existing header (flex, gap, rounded button).
+
+### Step 4: Wire apiService token on init — `frontend/src/services/api.ts`
+
+No changes needed — `apiService.setAuthToken()` already exists. The composable calls it.
+
+### Step 5: Set `FRONTEND_URL` env var
+
+Backend needs `FRONTEND_URL=http://localhost:20159` so the callback redirects to the correct frontend.
+
+---
+
+## Files
 
 | Action | File | Change |
 |--------|------|--------|
-| MODIFY | `src/coloring_book/api/app.py:34-78` | Extract token manager init before Google block |
-| MODIFY | `src/coloring_book/api/etsy_routes.py` | Full rewrite: callback→GET+HTML, DB tokens, state dict |
-| MODIFY | `frontend/src/components/EtsyPublisher.vue` | postMessage listener, real shop_id, connecting state |
-| CREATE | `tests/test_etsy_oauth_flow.py` | Backend OAuth flow tests |
-| CREATE | `frontend/e2e/etsy-oauth.spec.ts` | Playwright E2E for OAuth flow |
+| CREATE | `frontend/src/composables/useAuth.ts` | Auth composable with reactive state, OAuth callback parser, login/logout |
+| MODIFY | `frontend/src/App.vue` | Hash callback handling in onMounted, login/user UI in header |
+| CREATE | `frontend/.env.example` | Document required env vars (GOOGLE_CLIENT_ID, etc.) |
 
 ---
 
 ## Verification
 
-1. **Token persistence:** Start backend → connect Etsy → restart backend → `GET /etsy/status` → still connected
-2. **Callback redirect:** Click "Connect Etsy" → authorize on Etsy → popup auto-closes → frontend shows "Connected"
-3. **Shop ID:** After connection, verify shop_id appears in status response and frontend publish uses it
-4. **Disconnect:** Click "Disconnect" → verify `ProviderToken` row deleted → status shows disconnected
-5. **Race condition:** Open two browser tabs → start OAuth in both → both complete without conflict
-6. **Backend tests:** `pytest tests/test_etsy_oauth_flow.py -v` — all pass
+1. Set env vars: `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `FRONTEND_URL=http://localhost:20159`
+2. Start backend + frontend
+3. Click "Login with Google" → redirected to Google → authorize → redirected back with tokens in hash
+4. Header shows user name, "Logout" button
+5. Refresh page → still logged in (localStorage)
+6. Click "Logout" → back to "Login with Google" button
+7. `curl -H "Authorization: Bearer {token}" localhost:10159/auth/me` → returns user

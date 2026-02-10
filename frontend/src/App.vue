@@ -17,13 +17,33 @@
           <span class="tab-label">{{ tab.label }}</span>
         </button>
       </nav>
-      <button
-        class="theme-toggle"
-        :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
-        @click="toggleTheme"
-      >
-        {{ isDark ? '\u2600\uFE0F' : '\uD83C\uDF19' }}
-      </button>
+      <div class="header-actions">
+        <template v-if="isAuthenticated">
+          <div class="user-info">
+            <img
+              v-if="user?.picture"
+              :src="user.picture"
+              :alt="user.name"
+              class="user-avatar"
+              referrerpolicy="no-referrer"
+            />
+            <span class="user-name">{{ user?.name }}</span>
+          </div>
+          <button class="auth-btn logout-btn" @click="logout">
+            Logout
+          </button>
+        </template>
+        <button v-else class="auth-btn login-btn" @click="loginWithGoogle">
+          Login with Google
+        </button>
+        <button
+          class="theme-toggle"
+          :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+          @click="toggleTheme"
+        >
+          {{ isDark ? '\u2600\uFE0F' : '\uD83C\uDF19' }}
+        </button>
+      </div>
     </header>
 
     <!-- Main Content Area -->
@@ -109,8 +129,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useTheme } from '@/composables/useTheme'
+import { useAuth } from '@/composables/useAuth'
 import WorkbookBuilder from '@/components/WorkbookBuilder.vue'
 import PromptLibraryUI from '@/components/PromptLibraryUI.vue'
 import VariationHistoryComparison from '@/components/VariationHistoryComparison.vue'
@@ -182,6 +203,14 @@ const promptTemplates: Template[] = [
 ]
 
 const { isDark, toggleTheme } = useTheme()
+const { user, isAuthenticated, initAuth, handleOAuthCallback, loginWithGoogle, logout } = useAuth()
+
+onMounted(() => {
+  if (!handleOAuthCallback()) {
+    initAuth()
+  }
+})
+
 const activeTab = ref('workbook')
 const comparisonRef = ref<InstanceType<typeof ComparisonLayout> | null>(null)
 const generatedOutput = ref<GeneratedOutput | null>(null)
@@ -538,6 +567,71 @@ html, body {
   font-size: var(--text-sm);
 }
 
+/* Header Actions (auth + theme toggle) */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.user-name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-shell-text);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-btn {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-slow) ease;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.login-btn {
+  background: linear-gradient(135deg, var(--color-brand-start) 0%, var(--color-brand-end) 100%);
+  border: none;
+  color: white;
+}
+
+.login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-brand);
+}
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid var(--color-shell-border);
+  color: var(--color-shell-text-muted);
+}
+
+.logout-btn:hover {
+  background: var(--color-shell-surface-hover);
+  border-color: var(--color-shell-border-hover);
+  color: var(--color-shell-text);
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .app-header {
@@ -580,6 +674,10 @@ html, body {
 
   .demo-buttons {
     flex-direction: column;
+  }
+
+  .user-name {
+    display: none;
   }
 }
 </style>
