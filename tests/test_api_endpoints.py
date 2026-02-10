@@ -19,9 +19,12 @@ import asyncio
 import uuid
 import pytest
 import httpx
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from httpx import ASGITransport
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from src.coloring_book.api.app import app
+from src.coloring_book.api.models import Base, Variation, get_db
 
 
 # ---------------------------------------------------------------------------
@@ -30,39 +33,36 @@ from src.coloring_book.api.app import app
 
 @pytest.fixture
 async def client():
-    """Create async test client backed by in-memory SQLite.
+    """Create async test client backed by in-memory async SQLite.
 
     Each test gets a completely fresh database so tests remain independent.
     The FastAPI dependency for get_db is overridden to use the test engine.
     """
-    from src.coloring_book.api import models
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
+    test_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-    test_engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
+    TestSessionFactory = async_sessionmaker(
+        test_engine, class_=AsyncSession, expire_on_commit=False,
     )
-    models.Base.metadata.create_all(bind=test_engine)
-    TestSession = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
-    def override_get_db():
-        db = TestSession()
-        try:
-            yield db
-        finally:
-            db.close()
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        async with TestSessionFactory() as session:
+            yield session
 
-    app.dependency_overrides[models.get_db] = override_get_db
+    app.dependency_overrides[get_db] = override_get_db
 
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         # Attach session factory so helpers can seed the DB directly
-        c._test_session_factory = TestSession
+        c._test_session_factory = TestSessionFactory
         yield c
 
     app.dependency_overrides.clear()
-    models.Base.metadata.drop_all(bind=test_engine)
+
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await test_engine.dispose()
 
 
 # ---------------------------------------------------------------------------
@@ -82,17 +82,14 @@ async def _create_prompt(client: httpx.AsyncClient, **overrides) -> httpx.Respon
     return resp
 
 
-def _seed_variation_in_db(client: httpx.AsyncClient, **overrides) -> str:
+async def _seed_variation_in_db(client: httpx.AsyncClient, **overrides) -> str:
     """Insert a Variation row directly into the test DB and return its ID.
 
     This bypasses the API entirely so variation PATCH/DELETE tests do not
     depend on a POST endpoint existing.
     """
-    from src.coloring_book.api.models import Variation
-
     var_id = overrides.get("id", str(uuid.uuid4()))
-    session = client._test_session_factory()
-    try:
+    async with client._test_session_factory() as session:
         variation = Variation(
             id=var_id,
             prompt=overrides.get("prompt", "Draw a cat"),
@@ -105,9 +102,7 @@ def _seed_variation_in_db(client: httpx.AsyncClient, **overrides) -> str:
             generated_at=overrides.get("generated_at", datetime.now(timezone.utc)),
         )
         session.add(variation)
-        session.commit()
-    finally:
-        session.close()
+        await session.commit()
     return var_id
 
 
@@ -404,8 +399,8 @@ class TestVariationHistoryList:
 
     async def test_list_returns_seeded_variations(self, client):
         """After seeding variations in DB, GET returns them."""
-        _seed_variation_in_db(client, prompt="Draw a cat")
-        _seed_variation_in_db(client, prompt="Draw a dog")
+        await _seed_variation_in_db(client, prompt="Draw a cat")
+        await _seed_variation_in_db(client, prompt="Draw a dog")
 
         resp = await client.get("/api/v1/variations/history")
         assert resp.status_code == 200
@@ -418,7 +413,7 @@ class TestVariationPatch:
 
     async def test_patch_updates_rating(self, client):
         """PATCH with a valid rating (1-5) updates the variation."""
-        var_id = _seed_variation_in_db(client, rating=3)
+        var_id = await _seed_variation_in_db(client, rating=3)
 
         resp = await client.patch(
             f"/api/v1/variations/{var_id}",
@@ -431,7 +426,7 @@ class TestVariationPatch:
 
     async def test_patch_updates_notes(self, client):
         """PATCH with notes updates the variation's notes field."""
-        var_id = _seed_variation_in_db(client, notes="")
+        var_id = await _seed_variation_in_db(client, notes="")
 
         resp = await client.patch(
             f"/api/v1/variations/{var_id}",
@@ -455,7 +450,7 @@ class TestVariationPatch:
 
     async def test_patch_validates_rating_too_low(self, client):
         """PATCH with rating 0 (below minimum 1) returns 422."""
-        var_id = _seed_variation_in_db(client, rating=3)
+        var_id = await _seed_variation_in_db(client, rating=3)
 
         resp = await client.patch(
             f"/api/v1/variations/{var_id}",
@@ -468,7 +463,7 @@ class TestVariationPatch:
 
     async def test_patch_validates_rating_too_high(self, client):
         """PATCH with rating 6 (above maximum 5) returns 422."""
-        var_id = _seed_variation_in_db(client, rating=3)
+        var_id = await _seed_variation_in_db(client, rating=3)
 
         resp = await client.patch(
             f"/api/v1/variations/{var_id}",
@@ -481,7 +476,7 @@ class TestVariationPatch:
 
     async def test_patch_rating_boundary_min(self, client):
         """PATCH with rating=1 (minimum valid) succeeds."""
-        var_id = _seed_variation_in_db(client, rating=3)
+        var_id = await _seed_variation_in_db(client, rating=3)
 
         resp = await client.patch(
             f"/api/v1/variations/{var_id}",
@@ -493,7 +488,7 @@ class TestVariationPatch:
 
     async def test_patch_rating_boundary_max(self, client):
         """PATCH with rating=5 (maximum valid) succeeds."""
-        var_id = _seed_variation_in_db(client, rating=3)
+        var_id = await _seed_variation_in_db(client, rating=3)
 
         resp = await client.patch(
             f"/api/v1/variations/{var_id}",
@@ -505,7 +500,7 @@ class TestVariationPatch:
 
     async def test_patch_updates_both_rating_and_notes(self, client):
         """PATCH with both rating and notes updates both fields simultaneously."""
-        var_id = _seed_variation_in_db(client, rating=1, notes="old note")
+        var_id = await _seed_variation_in_db(client, rating=1, notes="old note")
 
         resp = await client.patch(
             f"/api/v1/variations/{var_id}",
@@ -523,7 +518,7 @@ class TestVariationDelete:
 
     async def test_delete_returns_200_on_success(self, client):
         """DELETE an existing variation returns 200."""
-        var_id = _seed_variation_in_db(client)
+        var_id = await _seed_variation_in_db(client)
 
         resp = await client.delete(f"/api/v1/variations/{var_id}")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
@@ -535,7 +530,7 @@ class TestVariationDelete:
 
     async def test_deleted_variation_not_in_history(self, client):
         """After deleting a variation, it no longer appears in history list."""
-        var_id = _seed_variation_in_db(client)
+        var_id = await _seed_variation_in_db(client)
 
         del_resp = await client.delete(f"/api/v1/variations/{var_id}")
         assert del_resp.status_code == 200
@@ -554,8 +549,8 @@ class TestVariationHistoryClear:
 
     async def test_clear_all_returns_200(self, client):
         """DELETE /api/v1/variations/history returns 200 with confirmation."""
-        _seed_variation_in_db(client, prompt="Cat")
-        _seed_variation_in_db(client, prompt="Dog")
+        await _seed_variation_in_db(client, prompt="Cat")
+        await _seed_variation_in_db(client, prompt="Dog")
 
         resp = await client.delete("/api/v1/variations/history")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
@@ -568,9 +563,9 @@ class TestVariationHistoryClear:
 
     async def test_clear_all_empties_history(self, client):
         """After clearing, GET /api/v1/variations/history returns empty list."""
-        _seed_variation_in_db(client, prompt="Cat")
-        _seed_variation_in_db(client, prompt="Dog")
-        _seed_variation_in_db(client, prompt="Bird")
+        await _seed_variation_in_db(client, prompt="Cat")
+        await _seed_variation_in_db(client, prompt="Dog")
+        await _seed_variation_in_db(client, prompt="Bird")
 
         # Clear all
         clear_resp = await client.delete("/api/v1/variations/history")

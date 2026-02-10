@@ -1,5 +1,6 @@
 """Coloring Book Generator — FastAPI Backend API"""
 import logging
+import os
 import random
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -8,9 +9,10 @@ from typing import Optional
 import httpx
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import Base, Prompt, Variation, WorkbookModel, create_tables, get_db
+from .models import Base, Prompt, User, Variation, WorkbookModel, create_tables, get_db
 from .schemas import GenerateRequest, PromptCreate, PromptUpdate, VariationUpdate
 from .workbook_routes import router as workbook_router
 from .etsy_routes import router as etsy_router
@@ -20,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    create_tables()
+    await create_tables()
     yield
 
 app = FastAPI(title="Coloring Book API", version="0.1.0", lifespan=lifespan)
@@ -32,6 +34,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- Auth integration (conditional — requires JWT_SECRET + Google OAuth env vars) ---
+_jwt_secret = os.environ.get("JWT_SECRET", "")
+_google_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+_google_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+
+if _jwt_secret and len(_jwt_secret) >= 32 and _google_client_id and _google_client_secret:
+    from starlette.middleware.sessions import SessionMiddleware
+    from auth_fastapi import AuthConfig, create_auth_router, register_auth_exception_handlers
+
+    _auth_config = AuthConfig(
+        google_client_id=_google_client_id,
+        google_client_secret=_google_client_secret,
+        jwt_secret=_jwt_secret,
+        frontend_url=os.environ.get("FRONTEND_URL", "http://localhost:5173"),
+        backend_url=os.environ.get("BACKEND_URL", None),
+    )
+
+    app.add_middleware(SessionMiddleware, secret_key=_auth_config.effective_session_secret)
+    register_auth_exception_handlers(app)
+
+    auth_router = create_auth_router(_auth_config, User, get_db)
+    app.include_router(auth_router, prefix="/auth")
+    logger.info("Auth router mounted at /auth")
+else:
+    logger.info("Auth not configured (missing JWT_SECRET/GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET)")
 
 # Mount workbook and Etsy routes
 app.include_router(workbook_router)
@@ -75,13 +103,14 @@ async def health():
 # --- Prompt Library ---
 
 @app.get("/api/v1/prompts/library")
-async def list_prompts(db: Session = Depends(get_db)):
-    prompts = db.query(Prompt).all()
+async def list_prompts(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Prompt))
+    prompts = result.scalars().all()
     return {"data": [_prompt_to_dict(p) for p in prompts]}
 
 
 @app.post("/api/v1/prompts/library", status_code=201)
-async def create_prompt(body: PromptCreate, db: Session = Depends(get_db)):
+async def create_prompt(body: PromptCreate, db: AsyncSession = Depends(get_db)):
     prompt = Prompt(
         name=body.name,
         prompt_text=body.promptText,
@@ -90,15 +119,16 @@ async def create_prompt(body: PromptCreate, db: Session = Depends(get_db)):
         is_public=body.isPublic,
     )
     db.add(prompt)
-    db.flush()
+    await db.flush()
     result = _prompt_to_dict(prompt)
-    db.commit()
+    await db.commit()
     return result
 
 
 @app.put("/api/v1/prompts/library/{prompt_id}")
-async def update_prompt(prompt_id: str, body: PromptUpdate, db: Session = Depends(get_db)):
-    prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+async def update_prompt(prompt_id: str, body: PromptUpdate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Prompt).where(Prompt.id == prompt_id))
+    prompt = result.scalars().first()
     if not prompt:
         raise HTTPException(status_code=404, detail="Prompt not found")
 
@@ -114,33 +144,36 @@ async def update_prompt(prompt_id: str, body: PromptUpdate, db: Session = Depend
         prompt.is_public = body.isPublic
 
     prompt.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(prompt)
+    await db.commit()
+    await db.refresh(prompt)
     return _prompt_to_dict(prompt)
 
 
 @app.delete("/api/v1/prompts/library/{prompt_id}")
-async def delete_prompt(prompt_id: str, db: Session = Depends(get_db)):
-    prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+async def delete_prompt(prompt_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Prompt).where(Prompt.id == prompt_id))
+    prompt = result.scalars().first()
     if not prompt:
         raise HTTPException(status_code=404, detail="Prompt not found")
 
-    db.delete(prompt)
-    db.commit()
+    await db.delete(prompt)
+    await db.commit()
     return {"message": "Prompt deleted"}
 
 
 # --- Variations ---
 
 @app.get("/api/v1/variations/history")
-async def list_variations(db: Session = Depends(get_db)):
-    variations = db.query(Variation).all()
+async def list_variations(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Variation))
+    variations = result.scalars().all()
     return {"data": [_variation_to_dict(v) for v in variations]}
 
 
 @app.patch("/api/v1/variations/{variation_id}")
-async def update_variation(variation_id: str, body: VariationUpdate, db: Session = Depends(get_db)):
-    variation = db.query(Variation).filter(Variation.id == variation_id).first()
+async def update_variation(variation_id: str, body: VariationUpdate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Variation).where(Variation.id == variation_id))
+    variation = result.scalars().first()
     if not variation:
         raise HTTPException(status_code=404, detail="Variation not found")
 
@@ -149,26 +182,31 @@ async def update_variation(variation_id: str, body: VariationUpdate, db: Session
     if body.notes is not None:
         variation.notes = body.notes
 
-    db.commit()
-    db.refresh(variation)
+    await db.commit()
+    await db.refresh(variation)
     return _variation_to_dict(variation)
 
 
 @app.delete("/api/v1/variations/history")
-async def clear_history(db: Session = Depends(get_db)):
-    count = db.query(Variation).delete()
-    db.commit()
+async def clear_history(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Variation))
+    variations = result.scalars().all()
+    count = len(variations)
+    for v in variations:
+        await db.delete(v)
+    await db.commit()
     return {"message": "History cleared", "deleted": count}
 
 
 @app.delete("/api/v1/variations/{variation_id}")
-async def delete_variation(variation_id: str, db: Session = Depends(get_db)):
-    variation = db.query(Variation).filter(Variation.id == variation_id).first()
+async def delete_variation(variation_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Variation).where(Variation.id == variation_id))
+    variation = result.scalars().first()
     if not variation:
         raise HTTPException(status_code=404, detail="Variation not found")
 
-    db.delete(variation)
-    db.commit()
+    await db.delete(variation)
+    await db.commit()
     return {"message": "Variation deleted"}
 
 
@@ -196,7 +234,7 @@ async def generate_image(
 
 
 @app.post("/api/v1/generate", status_code=201)
-async def generate(body: GenerateRequest, db: Session = Depends(get_db)):
+async def generate(body: GenerateRequest, db: AsyncSession = Depends(get_db)):
     """Generate a coloring book image using the specified model."""
     try:
         result = await generate_image(
@@ -219,7 +257,7 @@ async def generate(body: GenerateRequest, db: Session = Depends(get_db)):
         parameters={"style": body.style},
     )
     db.add(variation)
-    db.flush()
+    await db.flush()
     response = _variation_to_dict(variation)
-    db.commit()
+    await db.commit()
     return response

@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..etsy.client import (
     EtsyAuthError,
@@ -175,9 +175,9 @@ async def disconnect():
     "/workbooks/{workbook_id}/listing-preview",
     response_model=ListingPreviewResponse,
 )
-async def preview_listing(workbook_id: str, db: Session = Depends(get_db)):
+async def preview_listing(workbook_id: str, db: AsyncSession = Depends(get_db)):
     """Preview auto-generated listing metadata for a workbook."""
-    wb = get_workbook_by_id(db, workbook_id)
+    wb = await get_workbook_by_id(db, workbook_id)
     if not wb:
         raise HTTPException(status_code=404, detail="Workbook not found")
 
@@ -202,13 +202,13 @@ async def preview_listing(workbook_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/workbooks/{workbook_id}/publish", response_model=PublishResponse)
-async def publish_workbook(workbook_id: str, body: PublishRequest, db: Session = Depends(get_db)):
+async def publish_workbook(workbook_id: str, body: PublishRequest, db: AsyncSession = Depends(get_db)):
     """Create Etsy listing for a workbook.
 
     Requires the workbook to be generated (status=ready) and an active
     Etsy connection.
     """
-    wb = get_workbook_by_id(db, workbook_id)
+    wb = await get_workbook_by_id(db, workbook_id)
     if not wb:
         raise HTTPException(status_code=404, detail="Workbook not found")
 
@@ -258,7 +258,7 @@ async def publish_workbook(workbook_id: str, body: PublishRequest, db: Session =
 
         # Store listing ID on workbook
         wb.etsy_listing_id = str(listing.listing_id)
-        db.commit()
+        await db.commit()
 
         return PublishResponse(
             listing_id=listing.listing_id,

@@ -11,7 +11,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..workbook.compiler import WorkbookCompiler
 from ..workbook.image_gen import WorkbookImageGenerator
@@ -58,9 +59,10 @@ def _workbook_model_to_response(wb: WorkbookModel) -> WorkbookResponse:
     )
 
 
-def get_workbook_by_id(db: Session, workbook_id: str) -> Optional[WorkbookModel]:
+async def get_workbook_by_id(db: AsyncSession, workbook_id: str) -> Optional[WorkbookModel]:
     """Helper to fetch a workbook by ID. Used by etsy_routes too."""
-    return db.query(WorkbookModel).filter(WorkbookModel.id == workbook_id).first()
+    result = await db.execute(select(WorkbookModel).where(WorkbookModel.id == workbook_id))
+    return result.scalars().first()
 
 
 # --- Theme endpoints ---
@@ -107,14 +109,15 @@ async def get_theme_detail(slug: str):
 # --- Workbook CRUD ---
 
 @router.get("/workbooks", response_model=list[WorkbookResponse])
-async def list_workbooks(db: Session = Depends(get_db)):
+async def list_workbooks(db: AsyncSession = Depends(get_db)):
     """List all workbooks."""
-    workbooks = db.query(WorkbookModel).all()
+    result = await db.execute(select(WorkbookModel))
+    workbooks = result.scalars().all()
     return [_workbook_model_to_response(wb) for wb in workbooks]
 
 
 @router.post("/workbooks", response_model=WorkbookResponse, status_code=201)
-async def create_workbook(body: WorkbookCreate, db: Session = Depends(get_db)):
+async def create_workbook(body: WorkbookCreate, db: AsyncSession = Depends(get_db)):
     """Create a new workbook configuration."""
     # Validate theme exists
     try:
@@ -149,26 +152,26 @@ async def create_workbook(body: WorkbookCreate, db: Session = Depends(get_db)):
         updated_at=now,
     )
     db.add(wb)
-    db.flush()
+    await db.flush()
     result = _workbook_model_to_response(wb)
-    db.commit()
+    await db.commit()
 
     return result
 
 
 @router.get("/workbooks/{workbook_id}", response_model=WorkbookResponse)
-async def get_workbook(workbook_id: str, db: Session = Depends(get_db)):
+async def get_workbook(workbook_id: str, db: AsyncSession = Depends(get_db)):
     """Get workbook details."""
-    wb = get_workbook_by_id(db, workbook_id)
+    wb = await get_workbook_by_id(db, workbook_id)
     if not wb:
         raise HTTPException(status_code=404, detail="Workbook not found")
     return _workbook_model_to_response(wb)
 
 
 @router.put("/workbooks/{workbook_id}", response_model=WorkbookResponse)
-async def update_workbook(workbook_id: str, body: WorkbookUpdate, db: Session = Depends(get_db)):
+async def update_workbook(workbook_id: str, body: WorkbookUpdate, db: AsyncSession = Depends(get_db)):
     """Update workbook configuration."""
-    wb = get_workbook_by_id(db, workbook_id)
+    wb = await get_workbook_by_id(db, workbook_id)
     if not wb:
         raise HTTPException(status_code=404, detail="Workbook not found")
 
@@ -197,15 +200,15 @@ async def update_workbook(workbook_id: str, body: WorkbookUpdate, db: Session = 
     if wb.status == "ready":
         wb.status = "draft"
 
-    db.commit()
-    db.refresh(wb)
+    await db.commit()
+    await db.refresh(wb)
     return _workbook_model_to_response(wb)
 
 
 @router.delete("/workbooks/{workbook_id}")
-async def delete_workbook(workbook_id: str, db: Session = Depends(get_db)):
+async def delete_workbook(workbook_id: str, db: AsyncSession = Depends(get_db)):
     """Delete a workbook."""
-    wb = get_workbook_by_id(db, workbook_id)
+    wb = await get_workbook_by_id(db, workbook_id)
     if not wb:
         raise HTTPException(status_code=404, detail="Workbook not found")
 
@@ -214,8 +217,8 @@ async def delete_workbook(workbook_id: str, db: Session = Depends(get_db)):
     if task and not task.done():
         task.cancel()
 
-    db.delete(wb)
-    db.commit()
+    await db.delete(wb)
+    await db.commit()
     _pdfs.pop(workbook_id, None)
 
     return {"message": "Workbook deleted"}
@@ -224,9 +227,9 @@ async def delete_workbook(workbook_id: str, db: Session = Depends(get_db)):
 # --- Generation ---
 
 @router.post("/workbooks/{workbook_id}/generate", response_model=WorkbookStatusResponse)
-async def generate_workbook(workbook_id: str, db: Session = Depends(get_db)):
+async def generate_workbook(workbook_id: str, db: AsyncSession = Depends(get_db)):
     """Start PDF generation for a workbook (async)."""
-    wb = get_workbook_by_id(db, workbook_id)
+    wb = await get_workbook_by_id(db, workbook_id)
     if not wb:
         raise HTTPException(status_code=404, detail="Workbook not found")
 
@@ -235,7 +238,7 @@ async def generate_workbook(workbook_id: str, db: Session = Depends(get_db)):
 
     wb.status = "generating"
     wb.progress = 0.0
-    db.commit()
+    await db.commit()
 
     # Start async generation
     task = asyncio.create_task(_generate_pdf(workbook_id))
@@ -249,7 +252,7 @@ async def generate_workbook(workbook_id: str, db: Session = Depends(get_db)):
 async def _generate_pdf(workbook_id: str) -> None:
     """Background task: compile workbook to PDF.
 
-    Uses its own DB session since this runs outside the request lifecycle.
+    Uses its own sync DB session since this runs outside the request lifecycle.
     """
     db = SessionLocal()
     try:
@@ -298,9 +301,9 @@ async def _generate_pdf(workbook_id: str) -> None:
 
 
 @router.get("/workbooks/{workbook_id}/status", response_model=WorkbookStatusResponse)
-async def get_generation_status(workbook_id: str, db: Session = Depends(get_db)):
+async def get_generation_status(workbook_id: str, db: AsyncSession = Depends(get_db)):
     """Get workbook generation progress."""
-    wb = get_workbook_by_id(db, workbook_id)
+    wb = await get_workbook_by_id(db, workbook_id)
     if not wb:
         raise HTTPException(status_code=404, detail="Workbook not found")
 
@@ -312,9 +315,9 @@ async def get_generation_status(workbook_id: str, db: Session = Depends(get_db))
 
 
 @router.get("/workbooks/{workbook_id}/download")
-async def download_workbook(workbook_id: str, db: Session = Depends(get_db)):
+async def download_workbook(workbook_id: str, db: AsyncSession = Depends(get_db)):
     """Download generated PDF."""
-    wb = get_workbook_by_id(db, workbook_id)
+    wb = await get_workbook_by_id(db, workbook_id)
     if not wb:
         raise HTTPException(status_code=404, detail="Workbook not found")
 
@@ -334,14 +337,14 @@ async def download_workbook(workbook_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/workbooks/{workbook_id}/preview")
-async def preview_workbook(workbook_id: str, db: Session = Depends(get_db)):
+async def preview_workbook(workbook_id: str, db: AsyncSession = Depends(get_db)):
     """Preview workbook with activity breakdown and page thumbnails data.
 
     Returns generation status, activity mix breakdown with page ranges,
     and item sampling for each activity type so the frontend can render
     representative thumbnail previews.
     """
-    wb = get_workbook_by_id(db, workbook_id)
+    wb = await get_workbook_by_id(db, workbook_id)
     if not wb:
         raise HTTPException(status_code=404, detail="Workbook not found")
 

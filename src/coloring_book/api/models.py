@@ -1,26 +1,35 @@
 """SQLAlchemy models for Coloring Book API"""
+import os
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import create_engine, Column, String, Text, Boolean, Integer, Float, DateTime, JSON
+
+from sqlalchemy import Column, String, Text, Boolean, Integer, Float, DateTime, JSON, create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = "sqlite:///./coloring_book_api.db"
+# Async engine (primary — used by all FastAPI route handlers)
+# Use project-specific env var; falls back to generic DATABASE_URL only if it's SQLite-compatible
+_default_url = "sqlite+aiosqlite:///./coloring_book_api.db"
+DATABASE_URL = os.environ.get("COLORING_BOOK_DATABASE_URL", _default_url)
+engine = create_async_engine(DATABASE_URL)
+async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Sync engine (used only by _generate_pdf background task)
+SYNC_DATABASE_URL = DATABASE_URL.replace("+aiosqlite", "")
+sync_engine = create_engine(SYNC_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
+
 Base = declarative_base()
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db():
+    async with async_session() as session:
+        yield session
 
 
-def create_tables():
-    Base.metadata.create_all(bind=engine)
+async def create_tables():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 class Prompt(Base):
@@ -71,3 +80,17 @@ class WorkbookModel(Base):
     etsy_listing_id = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    name = Column(String(255), default="")
+    avatar_url = Column(String(500), nullable=True)
+    provider = Column(String(20), default="google")
+    provider_id = Column(String(100), default="")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_login_at = Column(DateTime, nullable=True)
