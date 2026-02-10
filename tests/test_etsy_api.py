@@ -3,19 +3,16 @@
 import os
 from unittest.mock import patch
 
+import coloring_book.api.etsy_routes as etsy_routes_module
 import pytest
+from coloring_book.api import models
+from coloring_book.api import workbook_routes as wr_module
+from coloring_book.api.app import app
+from coloring_book.api.workbook_routes import _generation_tasks, _pdfs
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from coloring_book.api.app import app
-from coloring_book.api import models
-from coloring_book.api import workbook_routes as wr_module
-from coloring_book.api.etsy_routes import _etsy_client, _etsy_state
-from coloring_book.api.workbook_routes import _pdfs, _generation_tasks
-from coloring_book.etsy.client import EtsyClient, TokenResponse
-import coloring_book.api.etsy_routes as etsy_routes_module
 
 
 @pytest.fixture(autouse=True)
@@ -29,6 +26,18 @@ def db_session(monkeypatch):
     models.Base.metadata.create_all(bind=test_engine)
     TestSession = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
+    # Create default system user for FK constraint
+    session = TestSession()
+    from coloring_book.api.app import DEFAULT_USER_ID
+    session.add(models.User(
+        id=DEFAULT_USER_ID,
+        email="system@localhost",
+        name="System",
+        provider="system",
+    ))
+    session.commit()
+    session.close()
+
     def override_get_db():
         db = TestSession()
         try:
@@ -41,16 +50,14 @@ def db_session(monkeypatch):
 
     _pdfs.clear()
     _generation_tasks.clear()
-    etsy_routes_module._etsy_client = None
-    etsy_routes_module._etsy_state = None
+    etsy_routes_module._pending_states.clear()
 
     yield TestSession
 
     app.dependency_overrides.clear()
     _pdfs.clear()
     _generation_tasks.clear()
-    etsy_routes_module._etsy_client = None
-    etsy_routes_module._etsy_state = None
+    etsy_routes_module._pending_states.clear()
     models.Base.metadata.drop_all(bind=test_engine)
 
 
@@ -73,6 +80,8 @@ def _create_test_workbook(client):
 class TestEtsyStatus:
     def test_status_not_connected(self, client):
         with patch.dict(os.environ, {"ETSY_API_KEY": "test_key", "ETSY_API_SECRET": "test_secret"}):
+            # Ensure no leftover tokens from other test runs
+            client.post("/api/v1/etsy/disconnect")
             response = client.get("/api/v1/etsy/status")
             assert response.status_code == 200
             assert response.json()["connected"] is False
@@ -103,12 +112,14 @@ class TestEtsyAuthURL:
             # First get auth URL to set state
             client.get("/api/v1/etsy/auth-url")
 
-            # Try callback with wrong state
-            response = client.post("/api/v1/etsy/callback", json={
-                "code": "test_code",
-                "state": "wrong_state",
-            })
-            assert response.status_code == 400
+            # Try callback with wrong state — returns HTML error page
+            response = client.get(
+                "/api/v1/etsy/callback",
+                params={"code": "test_code", "state": "wrong_state"},
+            )
+            assert response.status_code == 200  # HTML response
+            assert "etsy-oauth-complete" in response.text
+            assert "success: false" in response.text
 
 
 class TestListingPreview:

@@ -72,20 +72,20 @@ class TestWorkbookCompiler:
 
     @pytest.mark.asyncio
     async def test_compile_produces_pdf(self, compiler):
-        pdf_bytes = await compiler.compile()
+        result = await compiler.compile()
 
-        assert isinstance(pdf_bytes, bytes)
-        assert len(pdf_bytes) > 0
-        assert pdf_bytes[:5] == b"%PDF-"
+        assert isinstance(result.pdf_bytes, bytes)
+        assert len(result.pdf_bytes) > 0
+        assert result.pdf_bytes[:5] == b"%PDF-"
 
     @pytest.mark.asyncio
     async def test_compile_pdf_has_correct_page_count(self, compiler):
-        pdf_bytes = await compiler.compile()
+        result = await compiler.compile()
 
         # Count pages: cover (1) + activity pages (3+1+1+1+1+1 = 8) = 9
         # We can check by counting "showPage" or page markers in the PDF
         # Simpler: just verify it's a substantial PDF
-        assert len(pdf_bytes) > 1000
+        assert len(result.pdf_bytes) > 1000
 
     @pytest.mark.asyncio
     async def test_compile_invalid_config_raises(self):
@@ -103,8 +103,8 @@ class TestWorkbookCompiler:
         gen = WorkbookImageGenerator(ai_enabled=False, image_size=(128, 128))
         compiler = WorkbookCompiler(config=config, image_generator=gen)
 
-        pdf_bytes = await compiler.compile()
-        assert pdf_bytes[:5] == b"%PDF-"
+        result = await compiler.compile()
+        assert result.pdf_bytes[:5] == b"%PDF-"
 
     @pytest.mark.asyncio
     async def test_compile_with_a4_page_size(self):
@@ -112,8 +112,8 @@ class TestWorkbookCompiler:
         gen = WorkbookImageGenerator(ai_enabled=False, image_size=(128, 128))
         compiler = WorkbookCompiler(config=config, image_generator=gen)
 
-        pdf_bytes = await compiler.compile()
-        assert pdf_bytes[:5] == b"%PDF-"
+        result = await compiler.compile()
+        assert result.pdf_bytes[:5] == b"%PDF-"
 
     @pytest.mark.asyncio
     async def test_compile_minimal_config(self):
@@ -124,8 +124,8 @@ class TestWorkbookCompiler:
         gen = WorkbookImageGenerator(ai_enabled=False, image_size=(64, 64))
         compiler = WorkbookCompiler(config=config, image_generator=gen)
 
-        pdf_bytes = await compiler.compile()
-        assert pdf_bytes[:5] == b"%PDF-"
+        result = await compiler.compile()
+        assert result.pdf_bytes[:5] == b"%PDF-"
 
 
 class TestBuildPageSequence:

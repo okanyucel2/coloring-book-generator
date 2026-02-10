@@ -76,6 +76,7 @@ class WorkbookModel(Base):
     page_size = Column(String(10), default="letter")
     status = Column(String(20), default="draft")
     progress = Column(Float, nullable=True)
+    generation_stage = Column(String(50), nullable=True)
     pdf_path = Column(String(500), nullable=True)
     etsy_listing_id = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

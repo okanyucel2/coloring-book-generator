@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import logging
 import random
+from dataclasses import dataclass, field
 from typing import Optional
 
+from ..pdf.auditor import AuditResult, PDFAuditor, PDFQualityError
 from ..pdf.generator import PDFGenerator
 from ..pdf.layouts import PageLayout
+from ..pdf.profiles import PrintProfile, get_profile
 from .image_gen import WorkbookImageGenerator
 from .models import Workbook, WorkbookConfig, WorkbookItem
 from .page_types import (
@@ -25,6 +28,16 @@ from .themes import get_theme
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class CompileResult:
+    """Result of a workbook compilation."""
+
+    pdf_bytes: bytes
+    profile: PrintProfile
+    audit: AuditResult
+    page_count: int
+
+
 class WorkbookCompiler:
     """Compiles a WorkbookConfig into a multi-page PDF workbook."""
 
@@ -36,12 +49,21 @@ class WorkbookCompiler:
         self.config = config
         self.image_gen = image_generator or WorkbookImageGenerator(ai_enabled=False)
 
-    async def compile(self) -> bytes:
+    async def compile(self, profile: str = "home") -> CompileResult:
         """Generate all assets and compile into a PDF.
 
+        Args:
+            profile: Print profile name (home, etsy_standard, pro_print, poster)
+
         Returns:
-            PDF bytes
+            CompileResult with PDF bytes and audit info
+
+        Raises:
+            ValueError: If config is invalid or profile not found
+            PDFQualityError: If PDF fails quality audit
         """
+        print_profile = get_profile(profile)
+
         # Validate config
         errors = self.config.validate()
         if errors:
@@ -50,8 +72,11 @@ class WorkbookCompiler:
         # 1. Resolve items from theme if needed
         items_to_generate = self._resolve_items()
 
-        # 2. Generate all item assets
-        logger.info(f"Generating assets for {len(items_to_generate)} items...")
+        # 2. Generate all item assets at profile DPI
+        logger.info(
+            "Generating assets for %d items at %d DPI (%s profile)...",
+            len(items_to_generate), print_profile.dpi, profile,
+        )
         theme = get_theme(self.config.theme)
         item_pairs = [(name, theme.category) for name in items_to_generate]
         workbook_items = await self.image_gen.generate_items_batch(item_pairs)
@@ -62,13 +87,14 @@ class WorkbookCompiler:
         # 4. Build page sequence
         pages = self._build_page_sequence(workbook_items)
 
-        # 5. Create PDF
+        # 5. Create PDF with profile
         page_w, page_h = get_page_dimensions(self.config.page_size)
         pdf = PDFGenerator(
             title=self.config.title,
             author="Coloring Book Generator",
             page_width=page_w,
             page_height=page_h,
+            profile=print_profile,
         )
         pdf.set_metadata(
             title=self.config.title,
@@ -87,8 +113,22 @@ class WorkbookCompiler:
             activity_page.render(pdf_page)
 
         # 8. Generate PDF
-        logger.info(f"Compiled workbook: {pdf.page_count} pages")
-        return pdf.generate()
+        pdf_bytes = pdf.generate()
+        logger.info("Compiled workbook: %d pages, %.1f MB", pdf.page_count, len(pdf_bytes) / 1024 / 1024)
+
+        # 9. Quality audit
+        auditor = PDFAuditor(print_profile)
+        audit = auditor.audit(pdf_bytes)
+
+        if not audit.passed:
+            raise PDFQualityError(audit.issues)
+
+        return CompileResult(
+            pdf_bytes=pdf_bytes,
+            profile=print_profile,
+            audit=audit,
+            page_count=pdf.page_count,
+        )
 
     def _resolve_items(self) -> list[str]:
         """Resolve item list: use config items or pick from theme."""

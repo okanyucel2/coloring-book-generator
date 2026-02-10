@@ -6,7 +6,7 @@
     <div class="connection-section">
       <div :class="['connection-status', { connected: isConnected }]">
         <span class="status-dot"></span>
-        <span>{{ isConnected ? 'Connected to Etsy' : 'Not connected' }}</span>
+        <span>{{ isConnected ? (shopName ? `Connected: ${shopName}` : (shopId ? `Connected (Shop #${shopId})` : 'Connected to Etsy')) : 'Not connected' }}</span>
       </div>
       <button
         v-if="!isConnected"
@@ -91,8 +91,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { apiService } from '@/services/api'
+
+interface EtsyStatus {
+  connected: boolean
+  shop_id: number | null
+  shop_name: string | null
+  api_key_configured: boolean
+}
 
 interface ListingPreview {
   title: string
@@ -115,20 +122,46 @@ const props = defineProps<{
 const isConnected = ref(false)
 const connecting = ref(false)
 const publishing = ref(false)
+const shopId = ref<number | null>(null)
+const shopName = ref<string | null>(null)
 const listingPreview = ref<ListingPreview | null>(null)
 const publishResult = ref<PublishResult | null>(null)
 const editableTitle = ref('')
 const editableDescription = ref('')
 const editablePrice = ref(4.99)
+let connectingTimeout: ReturnType<typeof setTimeout> | null = null
 
 const canPublish = computed(() =>
   isConnected.value && props.workbookId && !publishing.value
 )
 
-import { computed } from 'vue'
+function handleOAuthMessage(event: MessageEvent) {
+  if (event.data?.type !== 'etsy-oauth-complete') return
+
+  if (event.data.success) {
+    isConnected.value = true
+    shopId.value = event.data.shopId ?? null
+    shopName.value = event.data.shopName ?? null
+  } else {
+    console.error('Etsy OAuth failed:', event.data.error)
+  }
+  connecting.value = false
+  if (connectingTimeout) {
+    clearTimeout(connectingTimeout)
+    connectingTimeout = null
+  }
+}
 
 onMounted(async () => {
+  window.addEventListener('message', handleOAuthMessage)
   await checkConnection()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('message', handleOAuthMessage)
+  if (connectingTimeout) {
+    clearTimeout(connectingTimeout)
+  }
 })
 
 watch(() => props.workbookId, async (id) => {
@@ -139,8 +172,10 @@ watch(() => props.workbookId, async (id) => {
 
 async function checkConnection() {
   try {
-    const status = await apiService.get<{ connected: boolean }>('/etsy/status')
+    const status = await apiService.get<EtsyStatus>('/etsy/status')
     isConnected.value = status.connected
+    shopId.value = status.shop_id
+    shopName.value = status.shop_name
   } catch {
     isConnected.value = false
   }
@@ -150,11 +185,16 @@ async function connectEtsy() {
   connecting.value = true
   try {
     const resp = await apiService.get<{ auth_url: string }>('/etsy/auth-url')
-    // Open Etsy OAuth in new window
     window.open(resp.auth_url, '_blank', 'width=600,height=700')
+    // Stay in "connecting" state until postMessage arrives or timeout
+    connectingTimeout = setTimeout(() => {
+      if (connecting.value) {
+        connecting.value = false
+        checkConnection() // Fallback: check status from API
+      }
+    }, 5 * 60 * 1000) // 5 minute timeout
   } catch (e) {
     console.error('Failed to get auth URL:', e)
-  } finally {
     connecting.value = false
   }
 }
@@ -163,6 +203,8 @@ async function disconnectEtsy() {
   try {
     await apiService.post('/etsy/disconnect')
     isConnected.value = false
+    shopId.value = null
+    shopName.value = null
   } catch (e) {
     console.error('Disconnect failed:', e)
   }
@@ -192,7 +234,7 @@ async function publishWorkbook() {
     const result = await apiService.post<PublishResult>(
       `/etsy/workbooks/${props.workbookId}/publish`,
       {
-        shop_id: 0, // Will need to be configured
+        shop_id: shopId.value, // Uses real shop_id from OAuth, or null (backend will fetch from DB)
         price_override: editablePrice.value,
       }
     )

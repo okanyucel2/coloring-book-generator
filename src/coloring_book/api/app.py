@@ -19,18 +19,48 @@ from .etsy_routes import router as etsy_router
 
 logger = logging.getLogger(__name__)
 
-# --- Provider Token Manager (encrypted token storage) ---
-_provider_token_manager = None
+# --- Default user ID for single-user flows (Etsy OAuth without Google auth) ---
+DEFAULT_USER_ID = "default-system-user"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await create_tables()
+    # Ensure a default user exists for provider token FK constraint
+    async with async_session() as db:
+        result = await db.execute(select(User).where(User.id == DEFAULT_USER_ID))
+        if not result.scalars().first():
+            db.add(User(
+                id=DEFAULT_USER_ID,
+                email="system@localhost",
+                name="System",
+                provider="system",
+            ))
+            await db.commit()
     yield
 
 app = FastAPI(title="Coloring Book API", version="0.1.0", lifespan=lifespan)
 
-# --- Auth integration (conditional — requires JWT_SECRET + Google OAuth env vars) ---
+# --- Provider Token Manager (encrypted token storage, needed for Etsy even without Google auth) ---
+_provider_token_manager = None
+try:
+    from auth_core.encryption import TokenEncryption
+    from .provider_token_service import DbProviderTokenManager
+
+    _provider_key = os.environ.get("PROVIDER_TOKEN_KEY", "")
+    if not _provider_key:
+        _provider_key = TokenEncryption.generate_key()
+        logger.warning("PROVIDER_TOKEN_KEY not set — using auto-generated key (dev only, tokens lost on restart)")
+    _token_encryption = TokenEncryption(_provider_key)
+    _provider_token_manager = DbProviderTokenManager(
+        encryption=_token_encryption,
+        session_factory=async_session,
+    )
+    logger.info("Provider token manager initialized (Etsy/provider token storage active)")
+except ImportError:
+    logger.warning("auth-core not installed — provider token manager disabled (Etsy tokens will be in-memory only)")
+
+# --- Google Auth integration (conditional — requires JWT_SECRET + Google OAuth env vars) ---
 _jwt_secret = os.environ.get("JWT_SECRET", "")
 _google_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
 _google_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
@@ -38,9 +68,7 @@ _google_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 if _jwt_secret and len(_jwt_secret) >= 32 and _google_client_id and _google_client_secret:
     try:
         from starlette.middleware.sessions import SessionMiddleware
-        from auth_core.encryption import TokenEncryption
         from auth_fastapi import AuthConfig, create_auth_router, register_auth_exception_handlers
-        from .provider_token_service import DbProviderTokenManager
 
         _auth_config = AuthConfig(
             google_client_id=_google_client_id,
@@ -50,17 +78,6 @@ if _jwt_secret and len(_jwt_secret) >= 32 and _google_client_id and _google_clie
             backend_url=os.environ.get("BACKEND_URL", None),
         )
 
-        # Provider token encryption — uses PROVIDER_TOKEN_KEY env var, auto-generates in dev
-        _provider_key = os.environ.get("PROVIDER_TOKEN_KEY", "")
-        if not _provider_key:
-            _provider_key = TokenEncryption.generate_key()
-            logger.warning("PROVIDER_TOKEN_KEY not set — using auto-generated key (dev only, tokens lost on restart)")
-        _token_encryption = TokenEncryption(_provider_key)
-        _provider_token_manager = DbProviderTokenManager(
-            encryption=_token_encryption,
-            session_factory=async_session,
-        )
-
         # SessionMiddleware must be added BEFORE CORSMiddleware so CORS ends up outermost
         # (Starlette processes middleware in LIFO order — last added = outermost)
         app.add_middleware(SessionMiddleware, secret_key=_auth_config.effective_session_secret)
@@ -68,14 +85,14 @@ if _jwt_secret and len(_jwt_secret) >= 32 and _google_client_id and _google_clie
 
         auth_router = create_auth_router(
             _auth_config, User, get_db,
-            token_encryption=_token_encryption,
+            token_encryption=_token_encryption if _provider_token_manager else None,
         )
         app.include_router(auth_router, prefix="/auth")
-        logger.info("Auth router mounted at /auth (provider token manager active)")
+        logger.info("Auth router mounted at /auth")
     except ImportError:
         logger.warning("Auth packages not installed (genesis-auth-core/auth-fastapi) — auth disabled")
 else:
-    logger.info("Auth not configured (missing JWT_SECRET/GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET)")
+    logger.info("Google auth not configured (missing JWT_SECRET/GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET)")
 
 # CORS must be added LAST so it's the outermost middleware and handles preflight OPTIONS
 app.add_middleware(
@@ -92,7 +109,7 @@ def get_provider_token_manager():
     if _provider_token_manager is None:
         raise HTTPException(
             status_code=503,
-            detail="Provider token manager not configured (auth not enabled)",
+            detail="Provider token manager not configured (auth-core package not installed)",
         )
     return _provider_token_manager
 

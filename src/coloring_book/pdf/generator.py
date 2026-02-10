@@ -1,5 +1,7 @@
 """PDF Generator - Create PDFs from coloring book content."""
 
+from __future__ import annotations
+
 from typing import Optional, List, Dict, Any
 from io import BytesIO
 from reportlab.pdfgen import canvas
@@ -12,6 +14,7 @@ import io
 
 # Import advanced PageLayout from layouts module
 from .layouts import PageLayout
+from .profiles import PrintProfile
 
 
 class PDFPage:
@@ -160,7 +163,7 @@ class PDFPage:
 
 
 class PDFGenerator:
-    """Generate PDF documents for coloring books."""
+    """Generate PDF documents with optional print profile support."""
 
     def __init__(
         self,
@@ -168,19 +171,28 @@ class PDFGenerator:
         author: str = "",
         page_width: float = 595,  # A4
         page_height: float = 842,  # A4
+        profile: Optional[PrintProfile] = None,
     ):
         """Initialize PDFGenerator.
 
         Args:
             title: Document title
             author: Document author
-            page_width: Default page width in points
-            page_height: Default page height in points
+            page_width: Default page width in points (content area, before bleed)
+            page_height: Default page height in points (content area, before bleed)
+            profile: Optional PrintProfile for print-ready output
         """
         self.title = title
         self.author = author
-        self.page_width = page_width
-        self.page_height = page_height
+        self.content_width = page_width
+        self.content_height = page_height
+        self.profile = profile
+
+        # Calculate actual page size including bleed
+        bleed = profile.bleed_points if profile else 0
+        self.page_width = page_width + 2 * bleed
+        self.page_height = page_height + 2 * bleed
+
         self.pages: List[PDFPage] = []
         self.metadata: Dict[str, str] = {
             "title": title,
@@ -190,13 +202,21 @@ class PDFGenerator:
     def add_page(self, layout: Optional[PageLayout] = None) -> PDFPage:
         """Add a new page to document.
 
+        Content coordinates are offset by bleed so callers don't need
+        to know about bleed — (0,0) in content space maps to the bleed
+        offset on the actual canvas.
+
         Args:
             layout: PageLayout configuration
 
         Returns:
             PDFPage object
         """
-        page = PDFPage(width=self.page_width, height=self.page_height, layout=layout)
+        page = PDFPage(
+            width=self.content_width,
+            height=self.content_height,
+            layout=layout,
+        )
         self.pages.append(page)
         return page
 
@@ -247,7 +267,7 @@ class PDFGenerator:
         """
         buffer = BytesIO()
 
-        # Create canvas
+        # Create canvas with full page size (including bleed)
         c = canvas.Canvas(buffer, pagesize=(self.page_width, self.page_height))
 
         # Set metadata
@@ -271,40 +291,95 @@ class PDFGenerator:
     def _draw_page(self, c: canvas.Canvas, page: PDFPage) -> None:
         """Draw a page on the canvas.
 
-        Args:
-            c: ReportLab canvas
-            page: PDFPage to draw
+        Applies bleed offset so content coordinates map correctly,
+        then draws crop marks in the bleed area if profile requires them.
         """
+        bleed = self.profile.bleed_points if self.profile else 0
+
+        # Draw crop marks first (in bleed area, behind content)
+        if self.profile and self.profile.show_crop_marks and bleed > 0:
+            self._draw_crop_marks(c, bleed)
+
+        # Apply bleed offset for content elements
         for element in page.elements:
-            if element["type"] == "text":
-                self._draw_text(c, element)
-            elif element["type"] == "image":
-                self._draw_image(c, element)
-            elif element["type"] == "svg":
-                self._draw_svg(c, element)
+            offset_element = self._offset_element(element, bleed)
+            if offset_element["type"] == "text":
+                self._draw_text(c, offset_element)
+            elif offset_element["type"] == "image":
+                self._draw_image(c, offset_element)
+            elif offset_element["type"] == "svg":
+                self._draw_svg(c, offset_element)
+
+    def _offset_element(self, element: Dict[str, Any], bleed: float) -> Dict[str, Any]:
+        """Create a copy of element with coordinates offset by bleed."""
+        offset = dict(element)
+        offset["x"] = element["x"] + bleed
+        offset["y"] = element["y"] + bleed
+        return offset
+
+    def _draw_crop_marks(self, c: canvas.Canvas, bleed: float) -> None:
+        """Draw L-shaped crop marks at the four corners of the content area."""
+        mark_len = 18  # ~6mm
+        mark_offset = 6  # gap between content edge and mark start
+
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(0.25)
+
+        # Content area corners in canvas coordinates
+        corners = [
+            (bleed, bleed),  # bottom-left
+            (bleed + self.content_width, bleed),  # bottom-right
+            (bleed, bleed + self.content_height),  # top-left
+            (bleed + self.content_width, bleed + self.content_height),  # top-right
+        ]
+
+        for cx, cy in corners:
+            # Determine direction of marks (outward from content)
+            h_dir = -1 if cx > self.page_width / 2 else 1
+            v_dir = -1 if cy > self.page_height / 2 else 1
+
+            # Horizontal mark
+            x_start = cx - h_dir * mark_offset
+            c.line(x_start, cy, x_start - h_dir * mark_len, cy)
+
+            # Vertical mark
+            y_start = cy - v_dir * mark_offset
+            c.line(cx, y_start, cx, y_start - v_dir * mark_len)
 
     def _draw_text(self, c: canvas.Canvas, element: Dict[str, Any]) -> None:
-        """Draw text element.
-
-        Args:
-            c: ReportLab canvas
-            element: Text element dictionary
-        """
+        """Draw text element."""
         c.setFont(element["font_name"], element["font_size"])
         c.drawString(element["x"], element["y"], element["text"])
 
     def _draw_image(self, c: canvas.Canvas, element: Dict[str, Any]) -> None:
-        """Draw image element.
-
-        Args:
-            c: ReportLab canvas
-            element: Image element dictionary
-        """
+        """Draw image element with optional grayscale conversion and JPEG compression."""
         try:
-            # Pass image bytes directly via ImageReader (no temp file)
-            img_reader = ImageReader(io.BytesIO(element["data"]))
+            img = Image.open(io.BytesIO(element["data"]))
 
-            # Draw on canvas
+            # Grayscale conversion if profile requests it
+            if self.profile and self.profile.color_space == "grayscale":
+                img = img.convert("L")
+            elif img.mode == "RGBA":
+                # Flatten alpha onto white background for PDF
+                bg = Image.new("RGB", img.size, (255, 255, 255))
+                bg.paste(img, mask=img.split()[3])
+                img = bg
+            elif img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
+
+            # Re-encode with profile's JPEG quality for compression
+            img_buffer = io.BytesIO()
+            save_format = "JPEG" if self.profile else "PNG"
+            save_kwargs: Dict[str, Any] = {}
+            if save_format == "JPEG":
+                save_kwargs["quality"] = self.profile.jpeg_quality
+                # JPEG doesn't support palette or alpha
+                if img.mode not in ("RGB", "L"):
+                    img = img.convert("RGB")
+            img.save(img_buffer, format=save_format, **save_kwargs)
+            img_buffer.seek(0)
+
+            img_reader = ImageReader(img_buffer)
             c.drawImage(
                 img_reader,
                 element["x"],
@@ -313,7 +388,7 @@ class PDFGenerator:
                 height=element["height"],
                 preserveAspectRatio=True,
             )
-        except Exception as e:
+        except Exception:
             # Fallback: draw a placeholder rectangle
             c.setStrokeColorRGB(0, 0, 0)
             c.setLineWidth(1)
@@ -334,19 +409,16 @@ class PDFGenerator:
         """
         try:
             svg_content = element["content"]
-            
+
             # Parse SVG to get dimensions
             root = ET.fromstring(svg_content)
             width_str = root.get("width", "200")
             height_str = root.get("height", "200")
-            
+
             # Extract numeric values
             svg_width = float(width_str.replace("px", ""))
             svg_height = float(height_str.replace("px", ""))
-            
-            # Create a simple placeholder for SVG (render as text for now)
-            # In production, use svglib or cairosvg for proper rendering
-            
+
             # For now, draw a frame and text
             c.setStrokeColorRGB(0.5, 0.5, 0.5)
             c.setLineWidth(2)
@@ -356,7 +428,7 @@ class PDFGenerator:
                 element["width"],
                 element["height"]
             )
-            
+
             # Draw SVG indicator
             c.setFont("Helvetica", 10)
             c.drawString(
@@ -364,8 +436,8 @@ class PDFGenerator:
                 element["y"] + element["height"] - 20,
                 f"SVG Drawing ({int(svg_width)}x{int(svg_height)})"
             )
-            
-        except Exception as e:
+
+        except Exception:
             # Fallback: draw error box
             c.setStrokeColorRGB(1, 0, 0)
             c.setLineWidth(1)

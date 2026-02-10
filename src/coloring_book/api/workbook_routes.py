@@ -249,6 +249,13 @@ async def generate_workbook(workbook_id: str, db: AsyncSession = Depends(get_db)
     )
 
 
+def _update_stage(db, wb: WorkbookModel, progress: float, stage: str) -> None:
+    """Update generation progress and stage label."""
+    wb.progress = progress
+    wb.generation_stage = stage
+    db.commit()
+
+
 async def _generate_pdf(workbook_id: str) -> None:
     """Background task: compile workbook to PDF.
 
@@ -259,6 +266,8 @@ async def _generate_pdf(workbook_id: str) -> None:
         wb = db.query(WorkbookModel).filter(WorkbookModel.id == workbook_id).first()
         if not wb:
             return
+
+        _update_stage(db, wb, 0.05, "Preparing configuration...")
 
         config = WorkbookConfig(
             theme=wb.theme,
@@ -274,14 +283,19 @@ async def _generate_pdf(workbook_id: str) -> None:
         gen = WorkbookImageGenerator(ai_enabled=False)
         compiler = WorkbookCompiler(config=config, image_generator=gen)
 
-        wb.progress = 0.1
-        db.commit()
+        _update_stage(db, wb, 0.10, "Generating images... (0/?)")
 
-        pdf_bytes = await compiler.compile()
+        result = await compiler.compile()
+        pdf_bytes = result.pdf_bytes
+
+        _update_stage(db, wb, 0.65, "Building page sequence...")
+        _update_stage(db, wb, 0.75, "Rendering pages to PDF...")
+        _update_stage(db, wb, 0.90, "Finalizing PDF...")
 
         _pdfs[workbook_id] = pdf_bytes
         wb.status = "ready"
         wb.progress = 1.0
+        wb.generation_stage = "Complete!"
         wb.updated_at = datetime.now(timezone.utc)
         db.commit()
 
@@ -294,6 +308,7 @@ async def _generate_pdf(workbook_id: str) -> None:
         if wb:
             wb.status = "failed"
             wb.progress = None
+            wb.generation_stage = None
             db.commit()
     finally:
         db.close()
@@ -311,6 +326,7 @@ async def get_generation_status(workbook_id: str, db: AsyncSession = Depends(get
         id=workbook_id,
         status=wb.status,
         progress=wb.progress,
+        stage=wb.generation_stage,
     )
 
 
@@ -336,6 +352,31 @@ async def download_workbook(workbook_id: str, db: AsyncSession = Depends(get_db)
         BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/workbooks/{workbook_id}/view")
+async def view_workbook(workbook_id: str, db: AsyncSession = Depends(get_db)):
+    """View generated PDF inline in the browser."""
+    wb = await get_workbook_by_id(db, workbook_id)
+    if not wb:
+        raise HTTPException(status_code=404, detail="Workbook not found")
+
+    if wb.status != "ready":
+        raise HTTPException(status_code=409, detail="Workbook not yet generated")
+
+    pdf_bytes = _pdfs.get(workbook_id)
+    if not pdf_bytes:
+        raise HTTPException(
+            status_code=404,
+            detail="PDF not in memory (server was restarted). Please regenerate the workbook.",
+        )
+
+    filename = f"{wb.title.replace(' ', '_')}.pdf"
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
 
 
@@ -380,13 +421,13 @@ async def preview_workbook(workbook_id: str, db: AsyncSession = Depends(get_db))
         "label": wb.title,
         "description": f"Cover page - {wb.theme} theme",
     })
-    # Pages 2-4: first activities
+    # Pages 2-8: first activities
     thumb_page = 2
     for activity_type, count in activity_mix.items():
         if count <= 0:
             continue
         for i in range(count):
-            if thumb_page > 4:
+            if thumb_page > 8:
                 break
             item = items[(thumb_page - 2) % len(items)] if items else "unknown"
             page_thumbnails.append({
@@ -396,7 +437,7 @@ async def preview_workbook(workbook_id: str, db: AsyncSession = Depends(get_db))
                 "description": f"{activity_type.replace('_', ' ').title()} - {item.replace('_', ' ').title()}",
             })
             thumb_page += 1
-        if thumb_page > 4:
+        if thumb_page > 8:
             break
 
     return {
