@@ -7,8 +7,10 @@ Pillow>=10.0.0
 numpy>=1.24.0
 reportlab>=4.0.0
 aiosqlite>=0.19.0
-genesis-auth-core>=1.1.0
-genesis-auth-flows>=1.1.0
-genesis-auth-fastapi>=1.0.0
+alembic>=1.13.0
+cryptography>=41.0.0
 authlib>=1.3.0
 itsdangerous>=2.0.0
+# genesis-auth-core, genesis-auth-flows, genesis-auth-fastapi:
+# Installed locally from genesisv3/packages/auth-* (not on PyPI).
+# Auth features activate only when these packages + env vars are present.

@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, String, Text, Boolean, Integer, Float, DateTime, JSON, create_engine
+from sqlalchemy import Column, String, Text, Boolean, Integer, Float, DateTime, JSON, LargeBinary, ForeignKey, UniqueConstraint, create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -94,3 +94,21 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     last_login_at = Column(DateTime, nullable=True)
+
+
+class ProviderToken(Base):
+    __tablename__ = "provider_tokens"
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider", name="uq_user_provider"),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider = Column(String(50), nullable=False)
+    encrypted_access_token = Column(LargeBinary, nullable=False)
+    encrypted_refresh_token = Column(LargeBinary, nullable=True)
+    scopes = Column(JSON, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    provider_metadata = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=True, onupdate=lambda: datetime.now(timezone.utc))

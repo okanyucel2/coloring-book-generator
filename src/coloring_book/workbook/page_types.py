@@ -147,18 +147,20 @@ class TraceAndColorPage(ActivityPage):
         # Instruction
         self._draw_instruction(pdf_page, "Trace the dashed lines, then color!", y=page_h - 110)
 
-        # Layout: colored reference (left) + dashed outline (right)
-        img_size = min(page_w / 2 - 80, page_h - 250)
-        img_y = page_h - 150 - img_size
+        # Layout: colored reference (left, smaller) + dashed outline (right, larger)
+        img_size = min(page_w / 2 - 60, page_h - 230)
+        img_y = page_h - 140 - img_size
 
         # Colored reference (left side)
         if self.item.colored_image:
+            ref_size = img_size * 0.9
+            ref_y = img_y + (img_size - ref_size) / 2
             pdf_page.add_image(
                 self.item.colored_image,
-                x=30, y=img_y, width=img_size * 0.8, height=img_size * 0.8,
+                x=30, y=ref_y, width=ref_size, height=ref_size,
             )
 
-        # Dashed outline (right side, larger)
+        # Dashed outline (right side, larger for tracing)
         if self.item.dashed_image:
             pdf_page.add_image(
                 self.item.dashed_image,

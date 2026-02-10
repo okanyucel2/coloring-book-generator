@@ -5,6 +5,7 @@ from io import BytesIO
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, letter, landscape
 from reportlab.lib.units import inch, mm
+from reportlab.lib.utils import ImageReader
 from PIL import Image
 import xml.etree.ElementTree as ET
 import io
@@ -300,22 +301,17 @@ class PDFGenerator:
             element: Image element dictionary
         """
         try:
-            # Convert bytes to PIL Image
-            img_buffer = io.BytesIO(element["data"])
-            img = Image.open(img_buffer)
-            
-            # Create temporary file for ReportLab
-            temp_path = "/tmp/pdf_temp_image.png"
-            img.save(temp_path)
-            
+            # Pass image bytes directly via ImageReader (no temp file)
+            img_reader = ImageReader(io.BytesIO(element["data"]))
+
             # Draw on canvas
             c.drawImage(
-                temp_path,
+                img_reader,
                 element["x"],
                 element["y"],
                 width=element["width"],
                 height=element["height"],
-                preserveAspectRatio=True
+                preserveAspectRatio=True,
             )
         except Exception as e:
             # Fallback: draw a placeholder rectangle

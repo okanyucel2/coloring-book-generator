@@ -326,7 +326,10 @@ async def download_workbook(workbook_id: str, db: AsyncSession = Depends(get_db)
 
     pdf_bytes = _pdfs.get(workbook_id)
     if not pdf_bytes:
-        raise HTTPException(status_code=404, detail="PDF not found")
+        raise HTTPException(
+            status_code=404,
+            detail="PDF not in memory (server was restarted). Please regenerate the workbook.",
+        )
 
     filename = f"{wb.title.replace(' ', '_')}.pdf"
     return StreamingResponse(

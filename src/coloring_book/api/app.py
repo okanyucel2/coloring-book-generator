@@ -12,12 +12,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import Base, Prompt, User, Variation, WorkbookModel, create_tables, get_db
+from .models import Base, Prompt, ProviderToken, User, Variation, WorkbookModel, async_session, create_tables, get_db
+from .provider_token_service import DbProviderTokenManager
 from .schemas import GenerateRequest, PromptCreate, PromptUpdate, VariationUpdate
 from .workbook_routes import router as workbook_router
 from .etsy_routes import router as etsy_router
 
 logger = logging.getLogger(__name__)
+
+# --- Provider Token Manager (encrypted token storage) ---
+_provider_token_manager: DbProviderTokenManager | None = None
 
 
 @asynccontextmanager
@@ -27,6 +31,53 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Coloring Book API", version="0.1.0", lifespan=lifespan)
 
+# --- Auth integration (conditional — requires JWT_SECRET + Google OAuth env vars) ---
+_jwt_secret = os.environ.get("JWT_SECRET", "")
+_google_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+_google_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+
+if _jwt_secret and len(_jwt_secret) >= 32 and _google_client_id and _google_client_secret:
+    try:
+        from starlette.middleware.sessions import SessionMiddleware
+        from auth_core.encryption import TokenEncryption
+        from auth_fastapi import AuthConfig, create_auth_router, register_auth_exception_handlers
+
+        _auth_config = AuthConfig(
+            google_client_id=_google_client_id,
+            google_client_secret=_google_client_secret,
+            jwt_secret=_jwt_secret,
+            frontend_url=os.environ.get("FRONTEND_URL", "http://localhost:5173"),
+            backend_url=os.environ.get("BACKEND_URL", None),
+        )
+
+        # Provider token encryption — uses PROVIDER_TOKEN_KEY env var, auto-generates in dev
+        _provider_key = os.environ.get("PROVIDER_TOKEN_KEY", "")
+        if not _provider_key:
+            _provider_key = TokenEncryption.generate_key()
+            logger.warning("PROVIDER_TOKEN_KEY not set — using auto-generated key (dev only, tokens lost on restart)")
+        _token_encryption = TokenEncryption(_provider_key)
+        _provider_token_manager = DbProviderTokenManager(
+            encryption=_token_encryption,
+            session_factory=async_session,
+        )
+
+        # SessionMiddleware must be added BEFORE CORSMiddleware so CORS ends up outermost
+        # (Starlette processes middleware in LIFO order — last added = outermost)
+        app.add_middleware(SessionMiddleware, secret_key=_auth_config.effective_session_secret)
+        register_auth_exception_handlers(app)
+
+        auth_router = create_auth_router(
+            _auth_config, User, get_db,
+            token_encryption=_token_encryption,
+        )
+        app.include_router(auth_router, prefix="/auth")
+        logger.info("Auth router mounted at /auth (provider token manager active)")
+    except ImportError:
+        logger.warning("Auth packages not installed (genesis-auth-core/auth-fastapi) — auth disabled")
+else:
+    logger.info("Auth not configured (missing JWT_SECRET/GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET)")
+
+# CORS must be added LAST so it's the outermost middleware and handles preflight OPTIONS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,31 +86,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Auth integration (conditional — requires JWT_SECRET + Google OAuth env vars) ---
-_jwt_secret = os.environ.get("JWT_SECRET", "")
-_google_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
-_google_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 
-if _jwt_secret and len(_jwt_secret) >= 32 and _google_client_id and _google_client_secret:
-    from starlette.middleware.sessions import SessionMiddleware
-    from auth_fastapi import AuthConfig, create_auth_router, register_auth_exception_handlers
+def get_provider_token_manager() -> DbProviderTokenManager:
+    """FastAPI dependency that returns the DbProviderTokenManager instance."""
+    if _provider_token_manager is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Provider token manager not configured (auth not enabled)",
+        )
+    return _provider_token_manager
 
-    _auth_config = AuthConfig(
-        google_client_id=_google_client_id,
-        google_client_secret=_google_client_secret,
-        jwt_secret=_jwt_secret,
-        frontend_url=os.environ.get("FRONTEND_URL", "http://localhost:5173"),
-        backend_url=os.environ.get("BACKEND_URL", None),
-    )
-
-    app.add_middleware(SessionMiddleware, secret_key=_auth_config.effective_session_secret)
-    register_auth_exception_handlers(app)
-
-    auth_router = create_auth_router(_auth_config, User, get_db)
-    app.include_router(auth_router, prefix="/auth")
-    logger.info("Auth router mounted at /auth")
-else:
-    logger.info("Auth not configured (missing JWT_SECRET/GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET)")
 
 # Mount workbook and Etsy routes
 app.include_router(workbook_router)
