@@ -4,21 +4,55 @@ import asyncio
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from coloring_book.api.app import app
-from coloring_book.api.workbook_routes import _pdfs, _workbooks, _generation_tasks
+from coloring_book.api import models
+from coloring_book.api import workbook_routes
+from coloring_book.api.workbook_routes import _pdfs, _generation_tasks
 
 
 @pytest.fixture(autouse=True)
-def cleanup_workbooks():
-    """Clear in-memory workbook stores between tests."""
-    _workbooks.clear()
+def db_session(monkeypatch):
+    """Create a fresh in-memory SQLite database for each test.
+
+    Overrides the get_db dependency so workbook routes use the test DB.
+    Uses StaticPool so all connections share the same in-memory database
+    (TestClient runs requests in a separate thread).
+    Also patches SessionLocal used by background tasks (_generate_pdf).
+    """
+    test_engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    models.Base.metadata.create_all(bind=test_engine)
+    TestSession = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+    def override_get_db():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[models.get_db] = override_get_db
+
+    # Patch SessionLocal in workbook_routes for background tasks
+    monkeypatch.setattr(workbook_routes, "SessionLocal", TestSession)
+
+    # Also clear in-memory stores
     _pdfs.clear()
     _generation_tasks.clear()
-    yield
-    _workbooks.clear()
+
+    yield TestSession
+
+    app.dependency_overrides.clear()
     _pdfs.clear()
     _generation_tasks.clear()
+    models.Base.metadata.drop_all(bind=test_engine)
 
 
 @pytest.fixture
@@ -111,7 +145,7 @@ class TestWorkbookCRUD:
         ]
 
     def test_create_workbook_invalid_theme(self, client):
-        response = _create_workbook(client, theme="dinosaurs")
+        response = _create_workbook(client, theme="nonexistent_theme_xyz")
         assert response.status_code == 400
         assert "Unknown theme" in response.json()["detail"]
 
@@ -230,7 +264,7 @@ class TestWorkbookGeneration:
         assert response.status_code == 404
 
     def test_full_generation_cycle(self, client):
-        """End-to-end: create → generate → wait → download."""
+        """End-to-end: create -> generate -> wait -> download."""
         # Create
         create_resp = _create_workbook(client, items=["fire_truck", "police_car"],
                                         activity_mix={"trace_and_color": 2})

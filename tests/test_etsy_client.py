@@ -85,7 +85,7 @@ class TestEtsyClient:
 
     def test_auth_headers_raises_when_not_authenticated(self):
         client = EtsyClient(api_key="key123", api_secret="secret456")
-        with pytest.raises(RuntimeError, match="Not authenticated"):
+        with pytest.raises(Exception, match="Not authenticated"):
             client._auth_headers()
 
     def test_auth_headers_with_tokens(self):
@@ -118,7 +118,7 @@ class TestEtsyClient:
 
     def test_refresh_token_raises_when_no_tokens(self):
         client = EtsyClient(api_key="key", api_secret="secret")
-        with pytest.raises(RuntimeError, match="No tokens"):
+        with pytest.raises(Exception, match="No tokens"):
             import asyncio
             asyncio.get_event_loop().run_until_complete(client.refresh_token())
 

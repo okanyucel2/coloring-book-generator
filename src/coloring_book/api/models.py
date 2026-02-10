@@ -50,3 +50,24 @@ class Variation(Base):
     notes = Column(Text, default="")
     parameters = Column(JSON, default=dict)
     generated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class WorkbookModel(Base):
+    __tablename__ = "workbooks"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    theme = Column(String(50), nullable=False)
+    title = Column(String(200), nullable=False)
+    subtitle = Column(String(200), nullable=True)
+    age_min = Column(Integer, default=3)
+    age_max = Column(Integer, default=5)
+    page_count = Column(Integer, default=30)
+    items_json = Column(JSON, default=list)
+    activity_mix_json = Column(JSON, default=dict)
+    page_size = Column(String(10), default="letter")
+    status = Column(String(20), default="draft")
+    progress = Column(Float, nullable=True)
+    pdf_path = Column(String(500), nullable=True)
+    etsy_listing_id = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

@@ -10,7 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from .models import Base, Prompt, Variation, create_tables, get_db
+from .models import Base, Prompt, Variation, WorkbookModel, create_tables, get_db
 from .schemas import GenerateRequest, PromptCreate, PromptUpdate, VariationUpdate
 from .workbook_routes import router as workbook_router
 from .etsy_routes import router as etsy_router

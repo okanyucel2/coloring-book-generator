@@ -5,28 +5,53 @@ from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from coloring_book.api.app import app
+from coloring_book.api import models
+from coloring_book.api import workbook_routes as wr_module
 from coloring_book.api.etsy_routes import _etsy_client, _etsy_state
-from coloring_book.api.workbook_routes import _pdfs, _workbooks, _generation_tasks
+from coloring_book.api.workbook_routes import _pdfs, _generation_tasks
 from coloring_book.etsy.client import EtsyClient, TokenResponse
 import coloring_book.api.etsy_routes as etsy_routes_module
 
 
 @pytest.fixture(autouse=True)
-def cleanup():
-    """Clean up state between tests."""
-    _workbooks.clear()
+def db_session(monkeypatch):
+    """Create a fresh in-memory SQLite database for each test."""
+    test_engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    models.Base.metadata.create_all(bind=test_engine)
+    TestSession = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+    def override_get_db():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[models.get_db] = override_get_db
+    monkeypatch.setattr(wr_module, "SessionLocal", TestSession)
+
     _pdfs.clear()
     _generation_tasks.clear()
     etsy_routes_module._etsy_client = None
     etsy_routes_module._etsy_state = None
-    yield
-    _workbooks.clear()
+
+    yield TestSession
+
+    app.dependency_overrides.clear()
     _pdfs.clear()
     _generation_tasks.clear()
     etsy_routes_module._etsy_client = None
     etsy_routes_module._etsy_state = None
+    models.Base.metadata.drop_all(bind=test_engine)
 
 
 @pytest.fixture
@@ -103,10 +128,18 @@ class TestListingPreview:
 
 
 class TestPublishWorkbook:
-    def test_publish_not_authenticated(self, client):
+    def test_publish_not_authenticated(self, client, db_session):
         wb_id = _create_test_workbook(client)
-        # Mark as ready and add fake PDF
-        _workbooks[wb_id]["status"] = "ready"
+
+        # Set workbook status to ready via DB
+        session = db_session()
+        wb = session.query(models.WorkbookModel).filter(
+            models.WorkbookModel.id == wb_id
+        ).first()
+        wb.status = "ready"
+        session.commit()
+        session.close()
+
         _pdfs[wb_id] = b"%PDF-1.4 test"
 
         with patch.dict(os.environ, {"ETSY_API_KEY": "key", "ETSY_API_SECRET": "secret"}):

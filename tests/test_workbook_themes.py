@@ -18,6 +18,51 @@ class TestThemeConfig:
     def test_animals_theme_exists(self):
         assert "animals" in THEMES
 
+    def test_dinosaurs_theme_exists(self):
+        assert "dinosaurs" in THEMES
+        theme = THEMES["dinosaurs"]
+        assert theme.display_name == "Dinosaurs"
+        assert theme.category == "animal"
+        assert "t_rex" in theme.items
+        assert "triceratops" in theme.items
+
+    def test_ocean_theme_exists(self):
+        assert "ocean" in THEMES
+        theme = THEMES["ocean"]
+        assert theme.display_name == "Ocean Animals"
+        assert theme.category == "animal"
+        assert "dolphin" in theme.items
+        assert "shark" in theme.items
+
+    def test_space_theme_exists(self):
+        assert "space" in THEMES
+        theme = THEMES["space"]
+        assert theme.display_name == "Space & Rockets"
+        assert theme.category == "science"
+        assert "rocket" in theme.items
+        assert "astronaut" in theme.items
+
+    def test_food_theme_exists(self):
+        assert "food" in THEMES
+        theme = THEMES["food"]
+        assert theme.display_name == "Yummy Food"
+        assert theme.category == "food"
+        assert "pizza" in theme.items
+        assert "cupcake" in theme.items
+
+    def test_all_themes_have_at_least_18_items(self):
+        for slug, theme in THEMES.items():
+            assert len(theme.items) >= 18, (
+                f"Theme '{slug}' has only {len(theme.items)} items (need at least 18)"
+            )
+
+    def test_all_themes_etsy_tags_under_20_chars(self):
+        for slug, theme in THEMES.items():
+            for tag in theme.etsy_tags:
+                assert len(tag) <= 20, (
+                    f"Theme '{slug}' has tag '{tag}' with {len(tag)} chars (max 20)"
+                )
+
     def test_vehicles_has_items(self):
         theme = THEMES["vehicles"]
         assert len(theme.items) >= 18
@@ -79,9 +124,29 @@ class TestGetTheme:
         assert theme.slug == "vehicles"
         assert theme.display_name == "Vehicles"
 
+    def test_get_dinosaurs_theme(self):
+        theme = get_theme("dinosaurs")
+        assert theme.slug == "dinosaurs"
+        assert theme.display_name == "Dinosaurs"
+
+    def test_get_ocean_theme(self):
+        theme = get_theme("ocean")
+        assert theme.slug == "ocean"
+        assert theme.display_name == "Ocean Animals"
+
+    def test_get_space_theme(self):
+        theme = get_theme("space")
+        assert theme.slug == "space"
+        assert theme.display_name == "Space & Rockets"
+
+    def test_get_food_theme(self):
+        theme = get_theme("food")
+        assert theme.slug == "food"
+        assert theme.display_name == "Yummy Food"
+
     def test_get_nonexistent_theme_raises(self):
         with pytest.raises(KeyError, match="Unknown theme"):
-            get_theme("dinosaurs")
+            get_theme("mythical_creatures")
 
     def test_error_message_lists_available(self):
         with pytest.raises(KeyError, match="vehicles"):
@@ -102,23 +167,29 @@ class TestListThemes:
         for theme in themes:
             assert isinstance(theme, ThemeConfig)
 
+    def test_list_includes_all_six_themes(self):
+        themes = list_themes()
+        slugs = {t.slug for t in themes}
+        expected = {"vehicles", "animals", "dinosaurs", "ocean", "space", "food"}
+        assert expected == slugs
+
 
 class TestRegisterTheme:
     def test_register_new_theme(self):
         new_theme = ThemeConfig(
-            slug="dinosaurs",
-            display_name="Dinosaurs",
-            category="animal",
-            items=["t_rex", "triceratops", "stegosaurus"],
+            slug="fantasy",
+            display_name="Fantasy",
+            category="fantasy",
+            items=["dragon", "unicorn", "wizard"],
             age_groups=["preschool"],
-            etsy_tags=["dinosaur coloring book"],
+            etsy_tags=["fantasy coloring"],
         )
         register_theme(new_theme)
-        assert "dinosaurs" in THEMES
-        assert get_theme("dinosaurs").display_name == "Dinosaurs"
+        assert "fantasy" in THEMES
+        assert get_theme("fantasy").display_name == "Fantasy"
 
         # Cleanup
-        del THEMES["dinosaurs"]
+        del THEMES["fantasy"]
 
     def test_register_overwrites_existing(self):
         original = THEMES["vehicles"]

@@ -1,5 +1,14 @@
 <template>
   <div class="workbook-builder">
+    <!-- Toast Notification -->
+    <Transition name="toast-fade">
+      <div v-if="toastMessage" :class="['toast', `toast-${toastType}`]">
+        <span class="toast-icon">{{ toastType === 'success' ? '&#10003;' : toastType === 'error' ? '&#10007;' : '&#9432;' }}</span>
+        <span class="toast-text">{{ toastMessage }}</span>
+        <button class="toast-close" @click="toastMessage = ''">&times;</button>
+      </div>
+    </Transition>
+
     <!-- Step Indicator -->
     <div class="steps-indicator">
       <button
@@ -18,7 +27,22 @@
     <div v-show="currentStep === 0" class="step-content">
       <h2>Choose a Theme</h2>
       <p class="step-description">Select the theme for your activity workbook</p>
-      <div v-if="themesLoading" class="themes-loading">Loading themes...</div>
+
+      <!-- Loading State -->
+      <div v-if="themesLoading" class="loading-container">
+        <div class="spinner"></div>
+        <p class="loading-text">Loading themes...</p>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="themesError" class="error-container">
+        <div class="error-icon">!</div>
+        <p class="error-title">Failed to load themes</p>
+        <p class="error-detail">{{ themesError }}</p>
+        <button class="retry-btn" @click="loadThemes">Try Again</button>
+      </div>
+
+      <!-- Themes Grid -->
       <div v-else class="themes-grid">
         <ThemeCard
           v-for="theme in themes"
@@ -114,18 +138,26 @@
             <p class="progress-text">Generating PDF... {{ Math.round(generationProgress * 100) }}%</p>
           </div>
 
+          <!-- Generation Error State -->
+          <div v-if="generationStatus === 'failed'" class="generation-error">
+            <div class="error-icon-small">!</div>
+            <p class="error-text">{{ generationError || 'PDF generation failed. Please try again.' }}</p>
+            <button class="retry-btn-small" @click="generateWorkbook">Retry</button>
+          </div>
+
           <div v-if="generationStatus === 'ready'" class="generation-ready">
             <p>PDF generated successfully!</p>
-            <a :href="downloadUrl" class="download-btn" download>Download PDF</a>
+            <a :href="downloadUrl" class="download-btn" download @click="onDownloadClick">Download PDF</a>
           </div>
 
           <button
             v-if="generationStatus !== 'generating'"
             class="generate-btn"
             @click="generateWorkbook"
-            :disabled="!canGenerate"
+            :disabled="!canGenerate || generationStatus === 'generating'"
           >
-            {{ generationStatus === 'ready' ? 'Regenerate' : 'Generate PDF' }}
+            <span v-if="generationStatus === 'generating'" class="btn-spinner"></span>
+            {{ generationStatus === 'ready' ? 'Regenerate' : generationStatus === 'generating' ? 'Generating...' : 'Generate PDF' }}
           </button>
         </div>
       </div>
@@ -177,12 +209,19 @@ const currentStep = ref(0)
 const maxReachedStep = ref(0)
 const themes = ref<Theme[]>([])
 const themesLoading = ref(false)
+const themesError = ref('')
 const selectedTheme = ref('')
 const selectedItems = ref<string[]>([])
 const createdWorkbookId = ref<string | null>(null)
 const generationStatus = ref<string>('draft')
 const generationProgress = ref(0)
+const generationError = ref('')
 const downloadUrl = ref('')
+
+// Toast notification state
+const toastMessage = ref('')
+const toastType = ref<'success' | 'error' | 'info'>('info')
+let toastTimeout: ReturnType<typeof setTimeout> | null = null
 
 const config = ref({
   title: '',
@@ -226,16 +265,34 @@ const canGenerate = computed(() =>
   selectedTheme.value && config.value.title && selectedItems.value.length > 0 && totalActivityPages.value > 0
 )
 
-onMounted(async () => {
+function showToast(message: string, type: 'success' | 'error' | 'info' = 'info', duration = 4000) {
+  if (toastTimeout) {
+    clearTimeout(toastTimeout)
+  }
+  toastMessage.value = message
+  toastType.value = type
+  toastTimeout = setTimeout(() => {
+    toastMessage.value = ''
+  }, duration)
+}
+
+async function loadThemes() {
   themesLoading.value = true
+  themesError.value = ''
   try {
     const resp = await apiService.get<{ data: Theme[] }>('/themes')
     themes.value = resp.data
   } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : 'Unable to connect to the server'
+    themesError.value = errorMsg
     console.error('Failed to load themes:', e)
   } finally {
     themesLoading.value = false
   }
+}
+
+onMounted(() => {
+  loadThemes()
 })
 
 function selectTheme(slug: string) {
@@ -296,6 +353,8 @@ async function createWorkbook() {
     })
     createdWorkbookId.value = resp.id
   } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : 'Failed to create workbook'
+    showToast(errorMsg, 'error')
     console.error('Failed to create workbook:', e)
   }
 }
@@ -308,6 +367,7 @@ async function generateWorkbook() {
 
   generationStatus.value = 'generating'
   generationProgress.value = 0
+  generationError.value = ''
 
   try {
     await apiService.post(`/workbooks/${createdWorkbookId.value}/generate`)
@@ -325,19 +385,31 @@ async function generateWorkbook() {
           const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1'
           downloadUrl.value = `${baseUrl}/workbooks/${createdWorkbookId.value}/download`
           clearInterval(pollInterval)
+          showToast('PDF generated successfully! Click Download to save.', 'success', 5000)
         } else if (status.status === 'failed') {
           generationStatus.value = 'failed'
+          generationError.value = 'The server encountered an error while generating your PDF.'
           clearInterval(pollInterval)
+          showToast('PDF generation failed. Please try again.', 'error')
         }
       } catch {
         clearInterval(pollInterval)
         generationStatus.value = 'failed'
+        generationError.value = 'Lost connection to the server during generation.'
+        showToast('Connection lost during PDF generation.', 'error')
       }
     }, 500)
   } catch (e) {
-    console.error('Generation failed:', e)
+    const errorMsg = e instanceof Error ? e.message : 'Generation request failed'
+    generationError.value = errorMsg
     generationStatus.value = 'failed'
+    showToast(`Generation failed: ${errorMsg}`, 'error')
+    console.error('Generation failed:', e)
   }
+}
+
+function onDownloadClick() {
+  showToast('Download started! Check your downloads folder.', 'success')
 }
 </script>
 
@@ -349,6 +421,227 @@ async function generateWorkbook() {
   padding: var(--space-8);
   border-radius: var(--radius-xl);
   min-height: 60vh;
+  position: relative;
+}
+
+/* Toast Notification */
+.toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  max-width: 420px;
+}
+
+.toast-success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+.toast-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.toast-info {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+}
+
+.toast-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.toast-text {
+  flex: 1;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 0 var(--space-1);
+  color: inherit;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-fade-enter-from {
+  opacity: 0;
+  transform: translateX(40px);
+}
+
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+/* Loading Container */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12) var(--space-8);
+  gap: var(--space-4);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-card-divider);
+  border-top-color: var(--color-brand-start);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: var(--color-card-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* Error Container */
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10) var(--space-8);
+  gap: var(--space-3);
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: var(--radius-xl);
+}
+
+.error-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.error-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-card-heading);
+}
+
+.error-detail {
+  font-size: var(--text-sm);
+  color: var(--color-card-text-muted);
+  text-align: center;
+  max-width: 400px;
+}
+
+.retry-btn {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  background: var(--color-brand-start);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s ease;
+}
+
+.retry-btn:hover {
+  background: #5a6fd6;
+}
+
+/* Generation Error */
+.generation-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+}
+
+.error-icon-small {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.error-text {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: #991b1b;
+}
+
+.retry-btn-small {
+  padding: var(--space-1) var(--space-3);
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
+.retry-btn-small:hover {
+  background: #dc2626;
+}
+
+/* Button spinner */
+.btn-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-right: var(--space-2);
+  vertical-align: middle;
 }
 
 /* Steps Indicator */
@@ -407,12 +700,6 @@ async function generateWorkbook() {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--space-5);
-}
-
-.themes-loading {
-  text-align: center;
-  padding: var(--space-8);
-  color: var(--color-card-text-muted);
 }
 
 /* Config Form */
@@ -578,6 +865,9 @@ async function generateWorkbook() {
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .generate-btn:hover:not(:disabled) {
@@ -629,5 +919,6 @@ async function generateWorkbook() {
   .form-row { grid-template-columns: repeat(2, 1fr); }
   .preview-generate-layout { grid-template-columns: 1fr; }
   .step-label { display: none; }
+  .toast { right: 12px; left: 12px; max-width: none; }
 }
 </style>

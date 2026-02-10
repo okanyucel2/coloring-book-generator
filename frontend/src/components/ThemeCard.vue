@@ -44,6 +44,10 @@ const themeIcon = computed(() => {
   const icons: Record<string, string> = {
     vehicles: '\uD83D\uDE97',
     animals: '\uD83D\uDC3E',
+    dinosaurs: '\uD83E\uDD95',
+    ocean: '\uD83D\uDC0B',
+    space: '\uD83D\uDE80',
+    food: '\uD83C\uDF55',
   }
   return icons[props.theme.slug] || '\uD83C\uDFA8'
 })
