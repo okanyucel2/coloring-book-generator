@@ -32,8 +32,8 @@ withDefaults(defineProps<{
 }
 
 .skeleton-card {
-  background: var(--color-surface-primary);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
   border-radius: var(--radius-xl);
   padding: var(--space-4);
 }
@@ -64,8 +64,8 @@ withDefaults(defineProps<{
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  background: var(--color-surface-primary);
-  border: 1px solid var(--color-border-light);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
 }
@@ -84,9 +84,9 @@ withDefaults(defineProps<{
 .shimmer {
   background: linear-gradient(
     90deg,
-    var(--color-surface-muted) 25%,
-    var(--color-surface-subtle) 50%,
-    var(--color-surface-muted) 75%
+    var(--color-card-bg-secondary) 25%,
+    var(--color-card-divider) 50%,
+    var(--color-card-bg-secondary) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
