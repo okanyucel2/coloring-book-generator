@@ -13,7 +13,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import Base, Prompt, ProviderToken, User, Variation, WorkbookModel, async_session, create_tables, get_db
-from .provider_token_service import DbProviderTokenManager
 from .schemas import GenerateRequest, PromptCreate, PromptUpdate, VariationUpdate
 from .workbook_routes import router as workbook_router
 from .etsy_routes import router as etsy_router
@@ -21,7 +20,7 @@ from .etsy_routes import router as etsy_router
 logger = logging.getLogger(__name__)
 
 # --- Provider Token Manager (encrypted token storage) ---
-_provider_token_manager: DbProviderTokenManager | None = None
+_provider_token_manager = None
 
 
 @asynccontextmanager
@@ -41,6 +40,7 @@ if _jwt_secret and len(_jwt_secret) >= 32 and _google_client_id and _google_clie
         from starlette.middleware.sessions import SessionMiddleware
         from auth_core.encryption import TokenEncryption
         from auth_fastapi import AuthConfig, create_auth_router, register_auth_exception_handlers
+        from .provider_token_service import DbProviderTokenManager
 
         _auth_config = AuthConfig(
             google_client_id=_google_client_id,
@@ -87,7 +87,7 @@ app.add_middleware(
 )
 
 
-def get_provider_token_manager() -> DbProviderTokenManager:
+def get_provider_token_manager():
     """FastAPI dependency that returns the DbProviderTokenManager instance."""
     if _provider_token_manager is None:
         raise HTTPException(
