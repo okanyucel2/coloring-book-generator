@@ -60,16 +60,13 @@ interface PreviewData {
 
 const props = defineProps<{
   workbookId: string | null
+  refreshKey?: number
 }>()
 
 const loading = ref(false)
 const previewData = ref<PreviewData | null>(null)
 
-watch(() => props.workbookId, async (id) => {
-  if (!id) {
-    previewData.value = null
-    return
-  }
+async function fetchPreview(id: string) {
   loading.value = true
   try {
     previewData.value = await apiService.get<PreviewData>(`/workbooks/${id}/preview`)
@@ -78,7 +75,21 @@ watch(() => props.workbookId, async (id) => {
   } finally {
     loading.value = false
   }
+}
+
+watch(() => props.workbookId, async (id) => {
+  if (!id) {
+    previewData.value = null
+    return
+  }
+  await fetchPreview(id)
 }, { immediate: true })
+
+watch(() => props.refreshKey, async () => {
+  if (props.workbookId) {
+    await fetchPreview(props.workbookId)
+  }
+})
 
 function formatActivityType(type: string): string {
   return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())

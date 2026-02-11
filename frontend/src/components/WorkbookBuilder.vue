@@ -116,9 +116,16 @@
       <h2>Preview & Generate</h2>
       <p class="step-description">Review your workbook and generate the PDF</p>
 
+      <!-- Page Thumbnail Gallery -->
+      <PageThumbnailGallery
+        v-if="previewThumbnails.length > 0"
+        :thumbnails="previewThumbnails"
+        :total-pages="previewTotalPages"
+      />
+
       <div class="preview-generate-layout">
         <div class="preview-section">
-          <WorkbookPreview :workbook-id="createdWorkbookId" />
+          <WorkbookPreview :workbook-id="createdWorkbookId" :refresh-key="previewRefreshKey" />
         </div>
         <div class="generate-section">
           <div class="summary-card">
@@ -131,11 +138,25 @@
             <div class="summary-row"><span>Page Size</span><strong>{{ config.page_size.toUpperCase() }}</strong></div>
           </div>
 
+          <!-- Activity Mix Adjustment -->
+          <ActivityMixer v-model="config.activity_mix" />
+
+          <!-- Generation Progress with Stages -->
           <div v-if="generationStatus === 'generating'" class="generation-progress">
+            <div class="progress-stages">
+              <div
+                v-for="s in GENERATION_STAGES"
+                :key="s.key"
+                :class="['stage-dot', { active: currentStageIdx >= s.idx, current: currentStageIdx === s.idx }]"
+              >
+                <span class="dot"></span>
+                <span class="stage-label">{{ s.label }}</span>
+              </div>
+            </div>
             <div class="progress-bar">
               <div class="progress-fill" :style="{ width: `${generationProgress * 100}%` }"></div>
             </div>
-            <p class="progress-text">Generating PDF... {{ Math.round(generationProgress * 100) }}%</p>
+            <p class="progress-text">{{ generationStage || 'Starting...' }}</p>
           </div>
 
           <!-- Generation Error State -->
@@ -145,9 +166,13 @@
             <button class="retry-btn-small" @click="generateWorkbook">Retry</button>
           </div>
 
+          <!-- Generation Ready -->
           <div v-if="generationStatus === 'ready'" class="generation-ready">
             <p>PDF generated successfully!</p>
-            <a :href="downloadUrl" class="download-btn" download @click="onDownloadClick">Download PDF</a>
+            <div class="ready-actions">
+              <button class="preview-pdf-btn" @click="showPdfViewer = true">Preview PDF</button>
+              <a :href="downloadUrl" class="download-btn" download @click="onDownloadClick">Download PDF</a>
+            </div>
           </div>
 
           <button
@@ -159,6 +184,14 @@
             <span v-if="generationStatus === 'generating'" class="btn-spinner"></span>
             {{ generationStatus === 'ready' ? 'Regenerate' : generationStatus === 'generating' ? 'Generating...' : 'Generate PDF' }}
           </button>
+
+          <!-- PDF Viewer -->
+          <PdfViewer
+            v-if="showPdfViewer && viewUrl"
+            :src="viewUrl"
+            :download-url="downloadUrl"
+            @close="showPdfViewer = false"
+          />
         </div>
       </div>
     </div>
@@ -187,6 +220,8 @@ import { apiService } from '@/services/api'
 import ThemeCard from './ThemeCard.vue'
 import ActivityMixer from './ActivityMixer.vue'
 import WorkbookPreview from './WorkbookPreview.vue'
+import PageThumbnailGallery from './PageThumbnailGallery.vue'
+import PdfViewer from './PdfViewer.vue'
 
 interface Theme {
   slug: string
@@ -215,8 +250,31 @@ const selectedItems = ref<string[]>([])
 const createdWorkbookId = ref<string | null>(null)
 const generationStatus = ref<string>('draft')
 const generationProgress = ref(0)
+const generationStage = ref('')
 const generationError = ref('')
 const downloadUrl = ref('')
+const viewUrl = ref('')
+const showPdfViewer = ref(false)
+const previewRefreshKey = ref(0)
+const previewThumbnails = ref<Array<{ page: number; type: string; label: string; description: string }>>([])
+const previewTotalPages = ref(0)
+
+const GENERATION_STAGES = [
+  { key: 'prepare', idx: 0, label: 'Prepare', threshold: 0.05 },
+  { key: 'images', idx: 1, label: 'Images', threshold: 0.10 },
+  { key: 'sequence', idx: 2, label: 'Sequence', threshold: 0.65 },
+  { key: 'render', idx: 3, label: 'Render', threshold: 0.75 },
+  { key: 'finalize', idx: 4, label: 'Finalize', threshold: 0.90 },
+]
+
+const currentStageIdx = computed(() => {
+  const p = generationProgress.value
+  let idx = -1
+  for (const s of GENERATION_STAGES) {
+    if (p >= s.threshold) idx = s.idx
+  }
+  return idx
+})
 
 // Toast notification state
 const toastMessage = ref('')
@@ -295,6 +353,43 @@ onMounted(() => {
   loadThemes()
 })
 
+// Debounced activity mix sync when on Step 3
+let mixDebounceTimer: ReturnType<typeof setTimeout> | null = null
+watch(() => config.value.activity_mix, (newMix) => {
+  if (currentStep.value !== 3 || !createdWorkbookId.value) return
+  if (mixDebounceTimer) clearTimeout(mixDebounceTimer)
+  mixDebounceTimer = setTimeout(async () => {
+    try {
+      await apiService.put(`/workbooks/${createdWorkbookId.value}`, {
+        activity_mix: newMix,
+      })
+      previewRefreshKey.value++
+      await fetchPreviewThumbnails()
+      // Reset generation status since config changed
+      if (generationStatus.value === 'ready') {
+        generationStatus.value = 'draft'
+        showPdfViewer.value = false
+      }
+    } catch (e) {
+      console.error('Failed to sync activity mix:', e)
+    }
+  }, 600)
+}, { deep: true })
+
+async function fetchPreviewThumbnails() {
+  if (!createdWorkbookId.value) return
+  try {
+    const data = await apiService.get<{
+      page_thumbnails: Array<{ page: number; type: string; label: string; description: string }>
+      total_pages: number
+    }>(`/workbooks/${createdWorkbookId.value}/preview`)
+    previewThumbnails.value = data.page_thumbnails
+    previewTotalPages.value = data.total_pages
+  } catch (e) {
+    console.error('Failed to fetch preview thumbnails:', e)
+  }
+}
+
 function selectTheme(slug: string) {
   selectedTheme.value = slug
   const theme = themes.value.find(t => t.slug === slug)
@@ -333,7 +428,9 @@ function nextStep() {
     }
     // Auto-create workbook when reaching step 4
     if (currentStep.value === 3 && !createdWorkbookId.value) {
-      createWorkbook()
+      createWorkbook().then(() => fetchPreviewThumbnails())
+    } else if (currentStep.value === 3 && createdWorkbookId.value) {
+      fetchPreviewThumbnails()
     }
   }
 }
@@ -367,7 +464,9 @@ async function generateWorkbook() {
 
   generationStatus.value = 'generating'
   generationProgress.value = 0
+  generationStage.value = ''
   generationError.value = ''
+  showPdfViewer.value = false
 
   try {
     await apiService.post(`/workbooks/${createdWorkbookId.value}/generate`)
@@ -375,15 +474,17 @@ async function generateWorkbook() {
     // Poll for status
     const pollInterval = setInterval(async () => {
       try {
-        const status = await apiService.get<{ status: string; progress: number | null }>(
+        const status = await apiService.get<{ status: string; progress: number | null; stage: string | null }>(
           `/workbooks/${createdWorkbookId.value}/status`
         )
         generationProgress.value = status.progress || 0
+        generationStage.value = status.stage || ''
 
         if (status.status === 'ready') {
           generationStatus.value = 'ready'
           const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
           downloadUrl.value = `${baseUrl}/workbooks/${createdWorkbookId.value}/download`
+          viewUrl.value = `${baseUrl}/workbooks/${createdWorkbookId.value}/view`
           clearInterval(pollInterval)
           showToast('PDF generated successfully! Click Download to save.', 'success', 5000)
         } else if (status.status === 'failed') {
@@ -876,6 +977,82 @@ function onDownloadClick() {
 }
 
 .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Stage Progress Indicator */
+.progress-stages {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+  padding: 0 var(--space-1);
+}
+
+.stage-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+}
+
+.stage-dot .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-card-divider);
+  transition: all 0.3s ease;
+}
+
+.stage-dot.active .dot {
+  background: var(--color-brand-start);
+}
+
+.stage-dot.current .dot {
+  background: var(--color-brand-start);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
+  animation: pulse-dot 1.5s ease infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25); }
+  50% { box-shadow: 0 0 0 6px rgba(102, 126, 234, 0.1); }
+}
+
+.stage-label {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--color-card-text-muted);
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
+.stage-dot.active .stage-label {
+  color: var(--color-brand-start);
+}
+
+/* Ready Actions */
+.ready-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+.preview-pdf-btn {
+  display: inline-block;
+  padding: var(--space-2) var(--space-5);
+  background: var(--color-brand-start);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-weight: 500;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  font-family: inherit;
+}
+
+.preview-pdf-btn:hover {
+  background: #5a6fd6;
+}
 
 /* Navigation */
 .step-navigation {

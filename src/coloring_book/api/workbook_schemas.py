@@ -64,6 +64,7 @@ class WorkbookStatusResponse(BaseModel):
     id: str
     status: str
     progress: Optional[float] = None
+    stage: Optional[str] = None
     error: Optional[str] = None
 
 
