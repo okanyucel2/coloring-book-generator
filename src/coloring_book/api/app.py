@@ -199,6 +199,27 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/api/v1/variations/match")
+async def match_variations_to_items(items: str, db: AsyncSession = Depends(get_db)):
+    """Find best matching variations for given workbook item names.
+
+    Args:
+        items: Comma-separated item names (e.g. "fire_truck,cat,lion")
+    """
+    item_list = [i.strip() for i in items.split(",") if i.strip()]
+    result = {}
+    for item in item_list:
+        display_name = item.replace("_", " ")
+        query = select(Variation).where(
+            Variation.image_url != "",
+            Variation.prompt.ilike(f"%{display_name}%"),
+        )
+        rows = await db.execute(query)
+        variations = rows.scalars().all()
+        result[item] = [_variation_to_dict(v) for v in variations]
+    return {"data": result}
+
+
 # --- Prompt Library ---
 
 @app.get("/api/v1/prompts/library")
@@ -311,24 +332,46 @@ async def delete_variation(variation_id: str, db: AsyncSession = Depends(get_db)
 
 # --- Image Generation ---
 
+GENESIS_BASE_URL = os.getenv("GENESIS_BASE_URL", "http://localhost:5000")
+
+
+def _map_model(model: str) -> str:
+    """Map model enum values to Genesis image generation model names."""
+    mapping = {
+        "gemini": "gemini",
+        "imagen": "imagen",
+        "imagen-ultra": "imagen-ultra",
+    }
+    return mapping.get(model, "gemini")
+
+
 async def generate_image(
     prompt: str,
     model: str,
     style: str = "coloring_book",
     seed: Optional[int] = None,
 ) -> dict:
-    """Call external image generation API and return result.
+    """Call Genesis image generation API and return result.
 
     This function is the mockable seam for tests. In production it calls
-    the configured provider (DALL-E 3, SDXL, Imagen).
+    the Genesis backend which routes to Gemini/Imagen.
 
     Returns:
         dict with keys: image_url, seed, model
     """
     actual_seed = seed if seed is not None else random.randint(0, 2**31)
-    # Placeholder: in production, dispatch to real provider based on model
-    # For now, return a generated URL pattern
-    image_url = f"https://api.example.com/generated/{model}/{actual_seed}.png"
+    url = f"{GENESIS_BASE_URL}/api/v1/image-generation/generate"
+    payload = {
+        "animal": prompt,
+        "style": style,
+        "difficulty": "medium",
+        "model": _map_model(model),
+    }
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(url, json=payload)
+        resp.raise_for_status()
+    data = resp.json()
+    image_url = f"{GENESIS_BASE_URL}{data['serve_url']}"
     return {"image_url": image_url, "seed": actual_seed, "model": model}
 
 

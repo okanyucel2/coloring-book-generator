@@ -5,9 +5,9 @@ from pydantic import BaseModel, Field
 
 
 class ModelName(str, Enum):
-    dalle3 = "dalle3"
-    sdxl = "sdxl"
+    gemini = "gemini"
     imagen = "imagen"
+    imagen_ultra = "imagen-ultra"
 
 
 class PromptCreate(BaseModel):

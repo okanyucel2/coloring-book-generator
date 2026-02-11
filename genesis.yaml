@@ -1,10 +1,21 @@
-backend:
-  command: "python -m uvicorn coloring_book.api.app:app --host 0.0.0.0 --port ${PORT}"
-  env:
-    PYTHONPATH: src
-  health_check: "/api/health"
-  ready_timeout: 10
+# genesis.yaml - Project001 (Coloring Book API) Configuration
+# GENESIS Process Manager v2.0 (Smart Port Allocation)
+#
+# Project: project001
+# Framework: fastapi + vite
+# Type: fullstack
+#
+# Port Allocation:
+#   - Backend: Auto-allocated (hash-based deterministic)
+#   - Frontend: Auto-allocated (hash-based deterministic)
 
-frontend:
-  command: "npx vite --host 0.0.0.0 --port ${PORT}"
-  cwd: frontend
+services:
+  backend:
+    start: "python -m uvicorn coloring_book.api.app:app --host 0.0.0.0"
+    health_check:
+      url: http://localhost:${PORT}/api/health
+    environment:
+      PYTHONPATH: "${PROJECT_DIR}/src"
+
+  frontend:
+    start: "cd frontend && npx vite --host 0.0.0.0"
