@@ -1,6 +1,12 @@
 """Coloring Book Generator — FastAPI Backend API"""
 import logging
 import os
+from pathlib import Path
+
+# Load project-level .env (override=True so project .env wins over root .env)
+from dotenv import load_dotenv
+_project_root = Path(__file__).resolve().parents[3]  # src/coloring_book/api/app.py → project root
+load_dotenv(_project_root / ".env", override=True)
 import random
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
