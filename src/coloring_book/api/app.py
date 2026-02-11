@@ -146,14 +146,11 @@ else:
 # List specific origins so Starlette reflects the actual origin header.
 _cors_origins = [
     "https://coloring-book-web-oha0.onrender.com",
-    "http://localhost:5173",
-    "http://localhost:19049",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:19049",
 ]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -358,8 +355,13 @@ def _map_model(model: str) -> str:
 
 def _get_public_base_url(request: Request) -> str:
     """Build this server's public URL from reverse-proxy headers."""
-    proto = request.headers.get("x-forwarded-proto", "https")
     host = request.headers.get("host", "localhost")
+    if request.headers.get("x-forwarded-proto"):
+        proto = request.headers["x-forwarded-proto"]
+    elif "localhost" in host or "127.0.0.1" in host:
+        proto = "http"
+    else:
+        proto = "https"
     return f"{proto}://{host}"
 
 
