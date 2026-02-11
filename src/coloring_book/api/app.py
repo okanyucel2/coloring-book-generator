@@ -363,17 +363,21 @@ def _get_public_base_url(request: Request) -> str:
     return f"{proto}://{host}"
 
 
+# Local image cache — stores generated images so we don't depend on
+# Genesis core backend's ephemeral cache (which fails with autoscaling).
+IMAGE_CACHE_DIR = Path(tempfile.gettempdir()) / "coloring_images"
+IMAGE_CACHE_DIR.mkdir(exist_ok=True)
+
+
 @app.get("/api/v1/images/{filename}")
 async def serve_image(filename: str):
-    """Proxy image from Genesis core backend to avoid CORS issues."""
-    genesis_url = f"{GENESIS_BASE_URL}/api/v1/image-generation/serve/{filename}"
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.get(genesis_url)
-        if resp.status_code != 200:
-            raise HTTPException(status_code=404, detail="Image not found")
+    """Serve locally cached image (downloaded at generation time)."""
+    local_path = IMAGE_CACHE_DIR / filename
+    if not local_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
     return Response(
-        content=resp.content,
-        media_type=resp.headers.get("content-type", "image/png"),
+        content=local_path.read_bytes(),
+        media_type="image/png",
         headers={"Cache-Control": "public, max-age=86400"},
     )
 
@@ -386,26 +390,31 @@ async def generate_image(
 ) -> dict:
     """Call Genesis image generation API and return result.
 
-    This function is the mockable seam for tests. In production it calls
-    the Genesis backend which routes to Gemini/Imagen.
+    Downloads image bytes immediately and caches locally so the
+    serve endpoint doesn't depend on Genesis cache availability.
 
     Returns:
         dict with keys: image_filename, seed, model
     """
     actual_seed = seed if seed is not None else random.randint(0, 2**31)
-    url = f"{GENESIS_BASE_URL}/api/v1/image-generation/generate"
+    url = f"{GENESIS_BASE_URL}/api/v1/image-generation/generate/raw"
     payload = {
         "animal": prompt,
         "style": style,
         "difficulty": "medium",
         "model": _map_model(model),
     }
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.post(url, json=payload)
         resp.raise_for_status()
-    data = resp.json()
-    # Extract just the filename for local proxy serving
-    filename = data['serve_url'].rsplit('/', 1)[-1]
+
+    # Raw endpoint returns PNG bytes + metadata headers
+    image_bytes = resp.content
+    filename = resp.headers.get("X-Filename", f"{actual_seed}.png")
+
+    # Cache locally
+    (IMAGE_CACHE_DIR / filename).write_bytes(image_bytes)
+
     return {"image_filename": filename, "seed": actual_seed, "model": model}
 
 
