@@ -20,6 +20,8 @@ class WorkbookCreate(BaseModel):
     items: Optional[list[str]] = None  # None = auto-select from theme
     activity_mix: Optional[dict[str, int]] = None  # None = default distribution
     page_size: str = Field("letter", pattern="^(letter|a4)$")
+    image_source: str = Field("auto", pattern="^(auto|history|ai|placeholder)$")
+    variation_image_map: Optional[dict[str, str]] = None  # item_name → variation_id
 
     model_config = {"populate_by_name": True}
 
@@ -35,6 +37,8 @@ class WorkbookUpdate(BaseModel):
     items: Optional[list[str]] = None
     activity_mix: Optional[dict[str, int]] = None
     page_size: Optional[str] = Field(None, pattern="^(letter|a4)$")
+    image_source: Optional[str] = Field(None, pattern="^(auto|history|ai|placeholder)$")
+    variation_image_map: Optional[dict[str, str]] = None
 
 
 class WorkbookResponse(BaseModel):
@@ -50,8 +54,10 @@ class WorkbookResponse(BaseModel):
     items: list[str]
     activity_mix: dict[str, int]
     page_size: str
+    image_source: str = "auto"
     status: str  # "draft", "generating", "ready", "failed"
     progress: Optional[float] = None
+    generation_cost_usd: float = 0.0
     pdf_url: Optional[str] = None
     etsy_listing_id: Optional[str] = None
     created_at: Optional[datetime] = None

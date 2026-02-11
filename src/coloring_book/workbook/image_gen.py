@@ -205,14 +205,22 @@ class WorkbookImageGenerator:
         ai_timeout: float = 30.0,
         ai_enabled: bool = True,
         image_size: tuple[int, int] = (512, 512),
+        variation_images: Optional[dict[str, bytes]] = None,
     ):
         self.ai_base_url = ai_base_url
         self.ai_timeout = ai_timeout
         self.ai_enabled = ai_enabled
         self.image_size = image_size
+        self.variation_images = variation_images or {}
+        self.total_cost_usd: float = 0.0
 
     async def generate_item(self, name: str, category: str) -> WorkbookItem:
         """Generate all image variants for a workbook item.
+
+        Uses a 3-tier fallback chain:
+        1. Variation history images (pre-fetched, highest priority)
+        2. AI generation via Genesis API
+        3. PIL placeholder drawing (always succeeds)
 
         Args:
             name: Item identifier (e.g. "fire_truck")
@@ -221,11 +229,18 @@ class WorkbookImageGenerator:
         Returns:
             WorkbookItem with colored, outline, and dashed images
         """
-        # 1. Get colored image (AI or fallback)
         colored = None
-        if self.ai_enabled:
+
+        # 1. Variation history (highest priority)
+        if name in self.variation_images:
+            colored = self.variation_images[name]
+            logger.info(f"Using variation history image for '{name}'")
+
+        # 2. AI generation
+        if colored is None and self.ai_enabled:
             colored = await self._generate_ai_colored(name, category)
 
+        # 3. PIL fallback
         if colored is None:
             colored = self._generate_placeholder_colored(name, category)
 
@@ -264,6 +279,14 @@ class WorkbookImageGenerator:
                 response.raise_for_status()
 
             image_bytes = response.content
+
+            # Track cost from response header
+            cost_str = response.headers.get("X-Cost-USD", "0.0")
+            try:
+                self.total_cost_usd += float(cost_str)
+            except (ValueError, TypeError):
+                pass
+
             # Validate it's a real image
             img = Image.open(io.BytesIO(image_bytes))
             img.verify()

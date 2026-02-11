@@ -18,7 +18,7 @@ from ..workbook.compiler import WorkbookCompiler
 from ..workbook.image_gen import WorkbookImageGenerator
 from ..workbook.models import DEFAULT_ACTIVITY_MIX, WorkbookConfig
 from ..workbook.themes import THEMES, get_theme, list_themes
-from .models import WorkbookModel, SessionLocal, get_db
+from .models import Variation, WorkbookModel, SessionLocal, get_db
 from .workbook_schemas import (
     ThemeListResponse,
     ThemeResponse,
@@ -50,8 +50,10 @@ def _workbook_model_to_response(wb: WorkbookModel) -> WorkbookResponse:
         items=wb.items_json or [],
         activity_mix=wb.activity_mix_json or {},
         page_size=wb.page_size,
+        image_source=wb.image_source or "auto",
         status=wb.status,
         progress=wb.progress,
+        generation_cost_usd=wb.generation_cost_usd or 0.0,
         pdf_url=f"/api/v1/workbooks/{wb.id}/download" if wb.status == "ready" else None,
         etsy_listing_id=wb.etsy_listing_id,
         created_at=wb.created_at,
@@ -145,6 +147,8 @@ async def create_workbook(body: WorkbookCreate, db: AsyncSession = Depends(get_d
         items_json=items,
         activity_mix_json=activity_mix,
         page_size=body.page_size,
+        image_source=body.image_source,
+        variation_image_map_json=body.variation_image_map,
         status="draft",
         progress=None,
         etsy_listing_id=None,
@@ -194,6 +198,10 @@ async def update_workbook(workbook_id: str, body: WorkbookUpdate, db: AsyncSessi
         wb.activity_mix_json = body.activity_mix
     if body.page_size is not None:
         wb.page_size = body.page_size
+    if body.image_source is not None:
+        wb.image_source = body.image_source
+    if body.variation_image_map is not None:
+        wb.variation_image_map_json = body.variation_image_map
 
     wb.updated_at = datetime.now(timezone.utc)
     # Reset to draft if config changed
@@ -256,6 +264,46 @@ def _update_stage(db, wb: WorkbookModel, progress: float, stage: str) -> None:
     db.commit()
 
 
+def _fetch_variation_images_sync(db, variation_map: dict[str, str]) -> dict[str, bytes]:
+    """Fetch image bytes for each variation_id in the map (sync, for background task)."""
+    import httpx
+
+    result = {}
+    for item_name, variation_id in variation_map.items():
+        row = db.query(Variation).filter(Variation.id == variation_id).first()
+        if row and row.image_url:
+            try:
+                with httpx.Client(timeout=15.0) as client:
+                    resp = client.get(row.image_url)
+                    resp.raise_for_status()
+                    result[item_name] = resp.content
+            except Exception as e:
+                logger.warning(f"Failed to fetch variation image for '{item_name}': {e}")
+    return result
+
+
+def _auto_match_variation_images_sync(db, items: list[str]) -> dict[str, bytes]:
+    """Auto-match best variation for each item by prompt similarity (sync)."""
+    import httpx
+
+    result = {}
+    for item in items:
+        display_name = item.replace("_", " ")
+        row = db.query(Variation).filter(
+            Variation.image_url != "",
+            Variation.prompt.ilike(f"%{display_name}%"),
+        ).order_by(Variation.rating.desc()).first()
+        if row and row.image_url:
+            try:
+                with httpx.Client(timeout=15.0) as client:
+                    resp = client.get(row.image_url)
+                    resp.raise_for_status()
+                    result[item] = resp.content
+            except Exception:
+                pass
+    return result
+
+
 async def _generate_pdf(workbook_id: str) -> None:
     """Background task: compile workbook to PDF.
 
@@ -280,13 +328,33 @@ async def _generate_pdf(workbook_id: str) -> None:
             page_size=wb.page_size,
         )
 
-        gen = WorkbookImageGenerator(ai_enabled=False)
+        # Image source routing
+        image_source = wb.image_source or "auto"
+        ai_enabled = image_source in ("auto", "ai")
+        variation_images: dict[str, bytes] = {}
+
+        if image_source in ("auto", "history"):
+            variation_map = wb.variation_image_map_json or {}
+            if variation_map:
+                _update_stage(db, wb, 0.07, "Fetching variation history images...")
+                variation_images = _fetch_variation_images_sync(db, variation_map)
+            elif image_source == "auto":
+                _update_stage(db, wb, 0.07, "Auto-matching variation images...")
+                variation_images = _auto_match_variation_images_sync(db, wb.items_json or [])
+
+        gen = WorkbookImageGenerator(
+            ai_enabled=ai_enabled,
+            variation_images=variation_images,
+        )
         compiler = WorkbookCompiler(config=config, image_generator=gen)
 
         _update_stage(db, wb, 0.10, "Generating images... (0/?)")
 
         result = await compiler.compile()
         pdf_bytes = result.pdf_bytes
+
+        # Accumulate cost from image generator
+        wb.generation_cost_usd = gen.total_cost_usd
 
         _update_stage(db, wb, 0.65, "Building page sequence...")
         _update_stage(db, wb, 0.75, "Rendering pages to PDF...")
