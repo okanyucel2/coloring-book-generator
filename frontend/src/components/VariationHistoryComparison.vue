@@ -34,10 +34,9 @@
         <label>Filter by Model:</label>
         <select v-model="filterModel" class="filter-select">
           <option value="">All Models</option>
-          <option value="dall-e-3">DALL-E 3</option>
-          <option value="midjourney">Midjourney</option>
-          <option value="stable-diffusion">Stable Diffusion</option>
-          <option value="flux">Flux</option>
+          <option value="gemini">Gemini</option>
+          <option value="imagen">Imagen</option>
+          <option value="imagen-ultra">Imagen Ultra</option>
         </select>
       </div>
 
@@ -403,7 +402,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { apiService } from '../services/api'
-import { sampleVariations } from '@/data/mock-data'
 import ConfirmDialog from './ConfirmDialog.vue'
 import SkeletonLoader from './SkeletonLoader.vue'
 import type { Variation, ConfirmDialogConfig, Notification } from '@/types'
@@ -532,9 +530,9 @@ const loadHistory = async (): Promise<void> => {
     const response = await apiService.get<{ data: Variation[] }>('/variations/history')
     variationHistory.value = response.data || []
   } catch (error: unknown) {
-    console.warn('API unavailable, using sample data')
-    variationHistory.value = sampleVariations as unknown as Variation[]
-    showNotification('Showing sample variations (API offline)', 'info')
+    console.warn('Failed to load variation history:', error)
+    variationHistory.value = []
+    showNotification('Failed to load history. Is the backend running?', 'error')
   } finally {
     isLoading.value = false
   }

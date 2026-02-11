@@ -31,23 +31,6 @@ vi.mock('../SkeletonLoader.vue', () => ({
   },
 }))
 
-// Mock sample data — provide realistic fallback so API-error test works
-vi.mock('@/data/mock-data', () => ({
-  sampleVariations: [
-    {
-      id: 'sample-1',
-      prompt: 'Sample lion portrait',
-      model: 'dall-e-3',
-      imageUrl: 'https://example.com/sample1.png',
-      rating: 4,
-      seed: 42581,
-      generatedAt: '2026-02-08T14:30:00Z',
-      notes: 'Sample variation',
-      parameters: { style: 'line-art' },
-    },
-  ],
-}))
-
 // Sample test data
 const mockVariations = [
   {
@@ -168,15 +151,16 @@ describe('VariationHistoryComparison Component', () => {
       expect(wrapper.find('.skeleton-timeline').exists()).toBe(false)
     })
 
-    it('handles API error gracefully with sample data', async () => {
+    it('handles API error gracefully with empty state', async () => {
       vi.mocked(apiService.get).mockRejectedValue(new Error('API Error'))
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       wrapper = mount(VariationHistoryComparison)
       await flushPromises()
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith('API unavailable, using sample data')
-      expect(wrapper.vm.variationHistory.length).toBeGreaterThan(0)
+      expect(consoleWarnSpy).toHaveBeenCalled()
+      expect(wrapper.vm.variationHistory.length).toBe(0)
+      expect(wrapper.find('.empty-state').exists()).toBe(true)
 
       consoleWarnSpy.mockRestore()
     })
@@ -249,10 +233,10 @@ describe('VariationHistoryComparison Component', () => {
 
     it('filters variations by model', async () => {
       const modelFilter = wrapper.find('select')
-      await modelFilter.setValue('dall-e-3')
+      await modelFilter.setValue('gemini')
       await flushPromises()
 
-      expect(wrapper.vm.filterModel).toBe('dall-e-3')
+      expect(wrapper.vm.filterModel).toBe('gemini')
       expect(wrapper.vm.filteredVariations.length).toBeLessThanOrEqual(mockVariations.length)
     })
 

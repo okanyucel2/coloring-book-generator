@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ComparisonLayout from '../ComparisonLayout.vue'
 
-describe('ComparisonLayout Component - TDD Flow', () => {
+describe('ComparisonLayout Component', () => {
   let wrapper: ReturnType<typeof mount>
 
   beforeEach(() => {
     wrapper = mount(ComparisonLayout)
   })
 
-  describe('🎯 CRITICAL: Grid Structure (Must Pass)', () => {
+  describe('Grid Structure', () => {
     it('should render exactly 3 model columns', () => {
       const columns = wrapper.findAll('.model-column')
       expect(columns).toHaveLength(3)
@@ -20,22 +20,22 @@ describe('ComparisonLayout Component - TDD Flow', () => {
       expect(grid.exists()).toBe(true)
     })
 
-    it('should render models in correct order: Claude, GPT-4, Gemini', () => {
+    it('should render models in correct order: Gemini, Imagen, Imagen Ultra', () => {
       const headers = wrapper.findAll('.model-header h2')
-      expect(headers.at(0)?.text()).toBe('Claude 3.5')
-      expect(headers.at(1)?.text()).toBe('GPT-4')
-      expect(headers.at(2)?.text()).toBe('Gemini 2.0')
+      expect(headers.at(0)?.text()).toBe('Gemini Flash')
+      expect(headers.at(1)?.text()).toBe('Imagen 4.0')
+      expect(headers.at(2)?.text()).toBe('Imagen 4.0 Ultra')
     })
 
     it('should assign correct data-model attributes to columns', () => {
       const columns = wrapper.findAll('.model-column')
-      expect(columns.at(0)?.attributes('data-model')).toBe('claude')
-      expect(columns.at(1)?.attributes('data-model')).toBe('gpt4')
-      expect(columns.at(2)?.attributes('data-model')).toBe('gemini')
+      expect(columns.at(0)?.attributes('data-model')).toBe('gemini')
+      expect(columns.at(1)?.attributes('data-model')).toBe('imagen')
+      expect(columns.at(2)?.attributes('data-model')).toBe('imagen-ultra')
     })
   })
 
-  describe('🎯 Output Display (Must Pass)', () => {
+  describe('Output Display', () => {
     it('should show placeholder text when no output exists', () => {
       const placeholders = wrapper.findAll('.model-placeholder')
       expect(placeholders).toHaveLength(3)
@@ -44,10 +44,10 @@ describe('ComparisonLayout Component - TDD Flow', () => {
 
     it('should display image when output is provided', async () => {
       const component = wrapper.vm as any
-      component.setModelOutput('claude', 'data:image/png;base64,test')
-      
+      component.setModelOutput('gemini', 'data:image/png;base64,test')
+
       await wrapper.vm.$nextTick()
-      
+
       const images = wrapper.findAll('.output-image')
       expect(images.length).toBeGreaterThan(0)
       expect(images.at(0)?.attributes('src')).toBe('data:image/png;base64,test')
@@ -55,47 +55,119 @@ describe('ComparisonLayout Component - TDD Flow', () => {
 
     it('should replace placeholder with image when output is set', async () => {
       const component = wrapper.vm as any
-      component.setModelOutput('gpt4', 'https://example.com/gpt4.png')
-      
+      component.setModelOutput('imagen', 'https://example.com/imagen.png')
+
       await wrapper.vm.$nextTick()
-      
+
       const columns = wrapper.findAll('.model-column')
-      const gpt4Column = columns.at(1)!
-      const image = gpt4Column.find('.output-image')
-      
+      const imagenColumn = columns.at(1)!
+      const image = imagenColumn.find('.output-image')
+
       expect(image.exists()).toBe(true)
-      expect(image.attributes('src')).toBe('https://example.com/gpt4.png')
+      expect(image.attributes('src')).toBe('https://example.com/imagen.png')
     })
 
     it('should have correct alt text for images', async () => {
       const component = wrapper.vm as any
-      component.setModelOutput('claude', 'data:image/png;base64,test')
-      
+      component.setModelOutput('gemini', 'data:image/png;base64,test')
+
       await wrapper.vm.$nextTick()
-      
+
       const image = wrapper.find('.output-image')
-      expect(image.attributes('alt')).toBe('Claude 3.5 output')
+      expect(image.attributes('alt')).toBe('Gemini Flash output')
     })
 
     it('should set correct alt text for all models when outputs are set', async () => {
       const component = wrapper.vm as any
-      component.setModelOutput('claude', 'img1.png')
-      component.setModelOutput('gpt4', 'img2.png')
-      component.setModelOutput('gemini', 'img3.png')
-      
+      component.setModelOutput('gemini', 'img1.png')
+      component.setModelOutput('imagen', 'img2.png')
+      component.setModelOutput('imagen-ultra', 'img3.png')
+
       await wrapper.vm.$nextTick()
-      
+
       const images = wrapper.findAll('.output-image')
-      expect(images.at(0)?.attributes('alt')).toBe('Claude 3.5 output')
-      expect(images.at(1)?.attributes('alt')).toBe('GPT-4 output')
-      expect(images.at(2)?.attributes('alt')).toBe('Gemini 2.0 output')
+      expect(images.at(0)?.attributes('alt')).toBe('Gemini Flash output')
+      expect(images.at(1)?.attributes('alt')).toBe('Imagen 4.0 output')
+      expect(images.at(2)?.attributes('alt')).toBe('Imagen 4.0 Ultra output')
     })
   })
 
-  describe('🎯 Component API (Must Pass)', () => {
+  describe('Loading State', () => {
+    it('should show loading spinner when setModelLoading is called', async () => {
+      const vm = wrapper.vm as any
+      vm.setModelLoading('gemini', true)
+
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.model-loading').exists()).toBe(true)
+      expect(wrapper.find('.spinner').exists()).toBe(true)
+    })
+
+    it('should hide loading and show image after setModelOutput', async () => {
+      const vm = wrapper.vm as any
+      vm.setModelLoading('gemini', true)
+      await wrapper.vm.$nextTick()
+
+      vm.setModelOutput('gemini', 'img.png')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.model-loading').exists()).toBe(false)
+      expect(wrapper.find('.output-image').exists()).toBe(true)
+    })
+  })
+
+  describe('Metadata Display', () => {
+    it('should display metadata when provided with setModelOutput', async () => {
+      const vm = wrapper.vm as any
+      vm.setModelOutput('gemini', 'img.png', {
+        duration: '3.2',
+        cost: '0.002',
+        size: '423.5 KB',
+        cached: false,
+      })
+
+      await wrapper.vm.$nextTick()
+
+      const meta = wrapper.find('.model-meta')
+      expect(meta.exists()).toBe(true)
+      expect(meta.text()).toContain('3.2s')
+      expect(meta.text()).toContain('$0.002')
+      expect(meta.text()).toContain('423.5 KB')
+    })
+
+    it('should show cached badge when cached is true', async () => {
+      const vm = wrapper.vm as any
+      vm.setModelOutput('gemini', 'img.png', {
+        duration: '0.1',
+        cost: '0.000',
+        size: '423.5 KB',
+        cached: true,
+      })
+
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.meta-badge.cached').exists()).toBe(true)
+    })
+
+    it('should not show metadata when not provided', async () => {
+      const vm = wrapper.vm as any
+      vm.setModelOutput('gemini', 'img.png')
+
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.model-meta').exists()).toBe(false)
+    })
+  })
+
+  describe('Component API', () => {
     it('should expose setModelOutput method', () => {
       const vm = wrapper.vm as any
       expect(typeof vm.setModelOutput).toBe('function')
+    })
+
+    it('should expose setModelLoading method', () => {
+      const vm = wrapper.vm as any
+      expect(typeof vm.setModelLoading).toBe('function')
     })
 
     it('should expose models ref', () => {
@@ -107,25 +179,25 @@ describe('ComparisonLayout Component - TDD Flow', () => {
     it('should update model reactively via setModelOutput', async () => {
       const vm = wrapper.vm as any
       vm.setModelOutput('gemini', 'https://example.com/image.png')
-      
+
       await wrapper.vm.$nextTick()
-      
-      expect(vm.models[2].output).toBe('https://example.com/image.png')
+
+      expect(vm.models[0].output).toBe('https://example.com/image.png')
     })
 
     it('should only update target model, not others', async () => {
       const vm = wrapper.vm as any
-      vm.setModelOutput('gpt4', 'https://example.com/gpt4.png')
-      
+      vm.setModelOutput('imagen', 'https://example.com/imagen.png')
+
       await wrapper.vm.$nextTick()
-      
+
       expect(vm.models[0].output).toBeUndefined()
-      expect(vm.models[1].output).toBe('https://example.com/gpt4.png')
+      expect(vm.models[1].output).toBe('https://example.com/imagen.png')
       expect(vm.models[2].output).toBeUndefined()
     })
   })
 
-  describe('🎯 Content & Structure (Must Pass)', () => {
+  describe('Content & Structure', () => {
     it('should have title "Multi-Model Comparison"', () => {
       expect(wrapper.find('h1').text()).toBe('Multi-Model Comparison')
     })
@@ -139,20 +211,9 @@ describe('ComparisonLayout Component - TDD Flow', () => {
       const headers = wrapper.findAll('.model-header')
       expect(headers).toHaveLength(3)
     })
-
-    it('should have valid HTML structure with proper nesting', () => {
-      const layout = wrapper.find('.comparison-layout')
-      expect(layout.exists()).toBe(true)
-      
-      const grid = layout.find('.comparison-grid')
-      expect(grid.exists()).toBe(true)
-      
-      const columns = grid.findAll('.model-column')
-      expect(columns).toHaveLength(3)
-    })
   })
 
-  describe('🎯 Reactivity & State (Must Pass)', () => {
+  describe('Reactivity & State', () => {
     it('should initialize all models with undefined output', () => {
       const vm = wrapper.vm as any
       expect(vm.models.every((m: any) => m.output === undefined)).toBe(true)
@@ -160,17 +221,17 @@ describe('ComparisonLayout Component - TDD Flow', () => {
 
     it('should handle multiple sequential updates', async () => {
       const vm = wrapper.vm as any
-      
-      vm.setModelOutput('claude', 'img1.png')
+
+      vm.setModelOutput('gemini', 'img1.png')
       await wrapper.vm.$nextTick()
       expect(vm.models[0].output).toBe('img1.png')
-      
-      vm.setModelOutput('gpt4', 'img2.png')
+
+      vm.setModelOutput('imagen', 'img2.png')
       await wrapper.vm.$nextTick()
       expect(vm.models[1].output).toBe('img2.png')
-      expect(vm.models[0].output).toBe('img1.png') // unchanged
-      
-      vm.setModelOutput('gemini', 'img3.png')
+      expect(vm.models[0].output).toBe('img1.png')
+
+      vm.setModelOutput('imagen-ultra', 'img3.png')
       await wrapper.vm.$nextTick()
       expect(vm.models[2].output).toBe('img3.png')
       expect(vm.models[0].output).toBe('img1.png')
@@ -180,10 +241,9 @@ describe('ComparisonLayout Component - TDD Flow', () => {
     it('should gracefully handle unknown model IDs', async () => {
       const vm = wrapper.vm as any
       vm.setModelOutput('unknown', 'img.png')
-      
+
       await wrapper.vm.$nextTick()
-      
-      // No error, models unchanged
+
       expect(vm.models[0].output).toBeUndefined()
       expect(vm.models[1].output).toBeUndefined()
       expect(vm.models[2].output).toBeUndefined()

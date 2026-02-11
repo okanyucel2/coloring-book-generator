@@ -77,18 +77,38 @@
           </div>
           <ComparisonLayout ref="comparisonRef" />
 
-          <!-- Demo Controls -->
+          <!-- Generation Controls -->
           <div class="demo-section">
-            <h3>Demo Controls</h3>
+            <h3>Generate Comparison</h3>
+            <div class="comparison-prompt-input">
+              <input
+                v-model="comparisonPrompt"
+                type="text"
+                placeholder="Enter a subject to generate (e.g., cute cat, butterfly mandala)..."
+                class="comparison-input"
+              />
+            </div>
             <div class="demo-buttons">
-              <button @click="simulateOutput('claude')" class="demo-btn">
-                Simulate Claude Output
+              <button
+                @click="generateWithModel('gemini')"
+                class="demo-btn"
+                :disabled="!comparisonPrompt || isComparing"
+              >
+                {{ isComparing ? 'Generating...' : 'Generate with Gemini' }}
               </button>
-              <button @click="simulateOutput('gpt4')" class="demo-btn">
-                Simulate GPT-4 Output
+              <button
+                @click="generateWithModel('imagen')"
+                class="demo-btn"
+                :disabled="!comparisonPrompt || isComparing"
+              >
+                {{ isComparing ? 'Generating...' : 'Generate with Imagen' }}
               </button>
-              <button @click="simulateOutput('gemini')" class="demo-btn">
-                Simulate Gemini Output
+              <button
+                @click="generateWithModel('imagen-ultra')"
+                class="demo-btn"
+                :disabled="!comparisonPrompt || isComparing"
+              >
+                {{ isComparing ? 'Generating...' : 'Generate with Imagen Ultra' }}
               </button>
             </div>
           </div>
@@ -222,13 +242,69 @@ const activeTab = ref('workbook')
 const comparisonRef = ref<InstanceType<typeof ComparisonLayout> | null>(null)
 const generatedOutput = ref<GeneratedOutput | null>(null)
 const isGenerating = ref(false)
+const comparisonPrompt = ref('')
+const isComparing = ref(false)
 
-// Demo function to simulate model output
-const simulateOutput = (modelId: string) => {
+// Approximate cost per generation by model (USD)
+const MODEL_COSTS: Record<string, number> = {
+  'gemini': 0.002,
+  'imagen': 0.02,
+  'imagen-ultra': 0.06,
+}
+
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const generateWithModel = async (modelId: string) => {
+  if (!comparisonPrompt.value) return
+  isComparing.value = true
+
   if (comparisonRef.value) {
-    // Using a placeholder image URL for demo
-    const demoImageUrl = `https://picsum.photos/seed/${modelId}-${Date.now()}/400/300`
-    comparisonRef.value.setModelOutput(modelId, demoImageUrl)
+    comparisonRef.value.setModelLoading(modelId, true)
+  }
+
+  const startTime = performance.now()
+  try {
+    const result = await apiService.post<{
+      imageUrl: string
+      model: string
+      parameters: Record<string, string>
+    }>('/generate', {
+      prompt: comparisonPrompt.value,
+      model: modelId,
+      style: 'coloring_book',
+    })
+
+    const durationSec = ((performance.now() - startTime) / 1000).toFixed(1)
+
+    // Fetch image to get actual file size
+    let sizeStr = '—'
+    try {
+      const headResp = await fetch(result.imageUrl, { method: 'HEAD' })
+      const contentLength = headResp.headers.get('content-length')
+      if (contentLength) {
+        sizeStr = formatBytes(parseInt(contentLength, 10))
+      }
+    } catch { /* ignore size fetch errors */ }
+
+    if (comparisonRef.value) {
+      comparisonRef.value.setModelOutput(modelId, result.imageUrl, {
+        duration: durationSec,
+        cost: (MODEL_COSTS[modelId] ?? 0).toFixed(3),
+        size: sizeStr,
+        cached: false,
+      })
+    }
+  } catch (error) {
+    console.error(`Generation failed for ${modelId}:`, error)
+    if (comparisonRef.value) {
+      comparisonRef.value.setModelLoading(modelId, false)
+    }
+  } finally {
+    isComparing.value = false
   }
 }
 
@@ -249,24 +325,23 @@ const handleGenerate = async (payload: GeneratePayload) => {
       generatedAt: string
     }>('/generate', {
       prompt: payload.prompt,
-      model: 'dalle3',
+      model: 'gemini',
       style: 'coloring_book',
     })
 
     const elapsed = (performance.now() - startTime) / 1000
 
     generatedOutput.value = {
-      modelName: result.model || 'DALL-E 3',
+      modelName: result.model || 'Gemini',
       imageUrl: result.imageUrl || '',
       generationTime: elapsed,
       qualityScore: 0.92,
     }
   } catch (error) {
     console.error('Generation failed:', error)
-    // Fallback to placeholder on error so UI doesn't break
     generatedOutput.value = {
-      modelName: 'DALL-E 3 (offline)',
-      imageUrl: `https://picsum.photos/seed/fallback-${Date.now()}/600/400`,
+      modelName: 'Generation Failed',
+      imageUrl: '',
       generationTime: 0,
       qualityScore: 0,
     }
@@ -470,6 +545,26 @@ html, body {
   margin-bottom: var(--space-4);
 }
 
+.comparison-prompt-input {
+  margin-bottom: var(--space-4);
+}
+
+.comparison-input {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-shell-border);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
+  background: var(--color-shell-surface);
+  color: var(--color-shell-text);
+  transition: border-color var(--transition-slow) ease;
+}
+
+.comparison-input:focus {
+  outline: none;
+  border-color: var(--color-brand-start);
+}
+
 .demo-buttons {
   display: flex;
   gap: var(--space-4);
@@ -488,9 +583,15 @@ html, body {
   font-family: inherit;
 }
 
-.demo-btn:hover {
+.demo-btn:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: var(--shadow-brand);
+}
+
+.demo-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Customize Tab */

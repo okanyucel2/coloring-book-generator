@@ -328,8 +328,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { apiService } from '../services/api'
-import { samplePrompts } from '@/data/mock-data'
-import type { MockPrompt } from '@/data/mock-data'
 import ConfirmDialog from './ConfirmDialog.vue'
 import SkeletonLoader from './SkeletonLoader.vue'
 import type { Prompt, ConfirmDialogConfig, Notification } from '@/types'
@@ -413,9 +411,9 @@ const loadPrompts = async (): Promise<void> => {
     const response = await apiService.get<{ data: Prompt[] }>('/prompts/library')
     savedPrompts.value = response.data || []
   } catch (error: unknown) {
-    console.warn('API unavailable, using sample data')
-    savedPrompts.value = samplePrompts as Prompt[]
-    showNotification('Showing sample prompts (API offline)', 'info')
+    console.warn('Failed to load prompts:', error)
+    savedPrompts.value = []
+    showNotification('Failed to load prompts. Is the backend running?', 'error')
   } finally {
     isLoading.value = false
   }

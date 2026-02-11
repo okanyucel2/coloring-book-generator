@@ -101,6 +101,30 @@
             </button>
           </div>
         </div>
+
+        <!-- Image Source Selection -->
+        <div class="form-group">
+          <label>Image Source</label>
+          <div class="image-source-options">
+            <label class="source-option" v-for="opt in imageSourceOptions" :key="opt.value">
+              <input type="radio" v-model="config.image_source" :value="opt.value" class="source-radio" />
+              <div class="source-card" :class="{ active: config.image_source === opt.value }">
+                <span class="source-icon">{{ opt.icon }}</span>
+                <div class="source-info">
+                  <strong>{{ opt.label }}</strong>
+                  <p>{{ opt.description }}</p>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Variation Picker (visible only when history mode selected) -->
+        <VariationPicker
+          :items="selectedItems"
+          :visible="config.image_source === 'history'"
+          @update:variation-map="variationMap = $event"
+        />
       </div>
     </div>
 
@@ -222,6 +246,7 @@ import ActivityMixer from './ActivityMixer.vue'
 import WorkbookPreview from './WorkbookPreview.vue'
 import PageThumbnailGallery from './PageThumbnailGallery.vue'
 import PdfViewer from './PdfViewer.vue'
+import VariationPicker from './VariationPicker.vue'
 
 interface Theme {
   slug: string
@@ -281,6 +306,19 @@ const toastMessage = ref('')
 const toastType = ref<'success' | 'error' | 'info'>('info')
 let toastTimeout: ReturnType<typeof setTimeout> | null = null
 
+const imageSourceOptions = [
+  { value: 'auto', icon: '\u26A1', label: 'Hybrid (Recommended)',
+    description: 'Uses variation history first, then AI, then simple shapes' },
+  { value: 'history', icon: '\uD83D\uDDBC\uFE0F', label: 'From Variation History',
+    description: 'Use previously generated AI images' },
+  { value: 'ai', icon: '\uD83E\uDD16', label: 'AI Generated',
+    description: 'Generate fresh images with Gemini/Imagen' },
+  { value: 'placeholder', icon: '\u270F\uFE0F', label: 'Simple Shapes',
+    description: 'Basic PIL-drawn shapes (fastest)' },
+]
+
+const variationMap = ref<Record<string, string>>({})
+
 const config = ref({
   title: '',
   subtitle: '',
@@ -288,6 +326,7 @@ const config = ref({
   age_max: 5,
   page_count: 30,
   page_size: 'letter',
+  image_source: 'auto',
   activity_mix: {
     trace_and_color: 18,
     which_different: 2,
@@ -447,6 +486,8 @@ async function createWorkbook() {
       items: selectedItems.value,
       activity_mix: config.value.activity_mix,
       page_size: config.value.page_size,
+      image_source: config.value.image_source,
+      variation_image_map: Object.keys(variationMap.value).length > 0 ? variationMap.value : undefined,
     })
     createdWorkbookId.value = resp.id
   } catch (e) {
@@ -846,6 +887,60 @@ function onDownloadClick() {
   gap: var(--space-4);
 }
 
+/* Image Source Selection */
+.image-source-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.source-option {
+  cursor: pointer;
+}
+
+.source-radio {
+  display: none;
+}
+
+.source-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-card-bg);
+  transition: all 0.15s ease;
+}
+
+.source-card:hover {
+  border-color: var(--color-brand-start);
+}
+
+.source-card.active {
+  border-color: var(--color-brand-start);
+  background: rgba(102, 126, 234, 0.06);
+}
+
+.source-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.source-info strong {
+  font-size: var(--text-sm);
+  color: var(--color-card-heading);
+  display: block;
+}
+
+.source-info p {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-card-text-muted);
+  margin: 2px 0 0;
+  line-height: 1.3;
+}
+
 /* Items Grid */
 .items-grid {
   display: flex;
@@ -1095,6 +1190,7 @@ function onDownloadClick() {
 @media (max-width: 768px) {
   .form-row { grid-template-columns: repeat(2, 1fr); }
   .preview-generate-layout { grid-template-columns: 1fr; }
+  .image-source-options { grid-template-columns: 1fr; }
   .step-label { display: none; }
   .toast { right: 12px; left: 12px; max-width: none; }
 }

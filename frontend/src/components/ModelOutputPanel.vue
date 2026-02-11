@@ -15,17 +15,17 @@
     <!-- Image Display -->
     <div class="image-container">
       <img
-        v-if="!imageError"
+        v-if="!imageError && imageUrl"
         class="model-image"
         :src="imageUrl"
         :alt="`${modelName} output`"
         @error="handleImageError"
       />
       <div v-else class="image-placeholder">
-        <span>Failed to load image</span>
+        <span>{{ imageUrl ? 'Failed to load image' : 'Generation failed' }}</span>
       </div>
-      <div v-if="imageError" class="error-message">
-        Failed to load image from {{ modelName }}
+      <div v-if="imageError || !imageUrl" class="error-message">
+        {{ imageUrl ? `Failed to load image from ${modelName}` : `${modelName} — check backend connection` }}
       </div>
     </div>
 
