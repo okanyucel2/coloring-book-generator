@@ -186,20 +186,19 @@ async def _generate_item(item, job, output_dir: Path) -> str:
     # Derive item name from filename (strip extension)
     item_name = Path(item.file).stem
 
-    # Generate the workbook item (returns WorkbookItem with colored/outline/dashed)
+    # Generate the workbook item (returns WorkbookItem with bytes fields)
     workbook_item = await generator.generate_item(
         name=item_name,
         category="custom",
     )
 
     # Save the outline image (most useful for coloring books)
+    # WorkbookItem stores images as bytes: outline_image, colored_image, dashed_image
     output_path = output_dir / f"{item_name}_coloring.png"
 
-    if workbook_item.outline:
-        workbook_item.outline.save(str(output_path))
-    elif workbook_item.colored:
-        workbook_item.colored.save(str(output_path))
-    else:
+    image_bytes = workbook_item.outline_image or workbook_item.colored_image
+    if not image_bytes:
         raise RuntimeError(f"No image generated for {item.file}")
 
+    output_path.write_bytes(image_bytes)
     return str(output_path)
