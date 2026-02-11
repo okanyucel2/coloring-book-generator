@@ -1,6 +1,8 @@
 """Coloring Book Generator — FastAPI Backend API"""
+import asyncio
 import logging
 import os
+import tempfile
 from pathlib import Path
 
 # Load project-level .env (override=True so project .env wins over root .env)
@@ -22,6 +24,12 @@ from .models import Base, Prompt, ProviderToken, User, Variation, WorkbookModel,
 from .schemas import GenerateRequest, PromptCreate, PromptUpdate, VariationUpdate
 from .workbook_routes import router as workbook_router
 from .etsy_routes import router as etsy_router
+from .batch_router import router as batch_router
+from . import batch_router as batch_router_module
+from ..services.batch_queue_optimized import BatchQueue
+from ..services.progress_tracker_optimized import ProgressTracker
+from ..services.zip_export import ZipExportService
+from ..services.batch_worker import batch_worker
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +51,38 @@ async def lifespan(app: FastAPI):
                 provider="system",
             ))
             await db.commit()
+
+    # --- Batch services startup ---
+    _batch_queue = BatchQueue()
+    await _batch_queue.start()
+
+    _progress_tracker = ProgressTracker()
+    await _progress_tracker.start_cleanup_task()
+
+    _zip_service = ZipExportService(temp_dir=os.path.join(tempfile.gettempdir(), "coloring_book_zip"))
+
+    # Inject singletons into the batch router module
+    batch_router_module.batch_queue = _batch_queue
+    batch_router_module.progress_tracker = _progress_tracker
+    batch_router_module.zip_service = _zip_service
+
+    # Start background worker
+    worker_task = asyncio.create_task(
+        batch_worker(_batch_queue, _progress_tracker, _zip_service)
+    )
+    logger.info("Batch services initialized (queue + tracker + worker)")
+
     yield
+
+    # --- Batch services shutdown ---
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        pass
+    await _batch_queue.stop()
+    await _progress_tracker.shutdown()
+    logger.info("Batch services shut down")
 
 app = FastAPI(title="Coloring Book API", version="0.1.0", lifespan=lifespan)
 
@@ -120,9 +159,10 @@ def get_provider_token_manager():
     return _provider_token_manager
 
 
-# Mount workbook and Etsy routes
+# Mount workbook, Etsy, and batch routes
 app.include_router(workbook_router)
 app.include_router(etsy_router)
+app.include_router(batch_router)
 
 
 def _prompt_to_dict(p: Prompt) -> dict:

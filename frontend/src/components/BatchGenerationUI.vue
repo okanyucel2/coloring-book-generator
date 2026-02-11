@@ -9,7 +9,7 @@
     <!-- Main Content Grid -->
     <div class="batch-content">
       <!-- Left Panel: Image Upload & Queue -->
-      <div class="batch-left-panel">
+      <div class="batch-panel">
         <div class="upload-section">
           <h3>1. Upload Images</h3>
           <div
@@ -76,7 +76,7 @@
                 class="btn-remove"
                 title="Remove from batch"
               >
-                ✕
+                &times;
               </button>
             </div>
           </div>
@@ -84,7 +84,7 @@
       </div>
 
       <!-- Right Panel: Settings & Controls -->
-      <div class="batch-right-panel">
+      <div class="batch-panel">
         <div class="settings-section">
           <h3>2. Configure Batch</h3>
 
@@ -130,14 +130,14 @@
                 </select>
               </div>
 
-              <div class="setting-group">
+              <div class="setting-group checkbox-group">
                 <label>
                   <input type="checkbox" v-model="generatePDF" />
                   Include PDF versions
                 </label>
               </div>
 
-              <div class="setting-group">
+              <div class="setting-group checkbox-group">
                 <label>
                   <input type="checkbox" v-model="autoDownload" />
                   Auto-download when complete
@@ -168,11 +168,11 @@
           </div>
 
           <div v-else-if="batchStatus === 'completed'" class="status-completed">
-            <p class="success-message">✓ Batch completed successfully!</p>
+            <p class="success-message">Batch completed successfully!</p>
           </div>
 
           <div v-else-if="batchStatus === 'failed'" class="status-failed">
-            <p class="error-message">✕ {{ errorMessage }}</p>
+            <p class="error-message">{{ errorMessage }}</p>
           </div>
         </div>
 
@@ -187,11 +187,19 @@
           </button>
 
           <button
+            v-if="batchStatus === 'processing'"
+            @click="cancelBatch"
+            class="btn-danger"
+          >
+            Cancel
+          </button>
+
+          <button
             v-if="batchStatus === 'completed'"
             @click="downloadBatch"
             class="btn-success"
           >
-            ⬇ Download ZIP ({{ totalFileSize }})
+            Download ZIP ({{ totalFileSize }})
           </button>
 
           <button
@@ -210,7 +218,7 @@
       <p class="ticker-label">Live Updates:</p>
       <div class="ticker-messages">
         <p v-for="(msg, idx) in recentMessages" :key="idx" class="ticker-msg">
-          • {{ msg }}
+          {{ msg }}
         </p>
       </div>
     </div>
@@ -218,7 +226,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 
 interface BatchItem {
   id: string
@@ -380,12 +388,14 @@ const submitBatch = async () => {
 const connectProgressStream = (batchId: string) => {
   eventSource.value = new EventSource(`/api/v1/batch/${batchId}/progress`)
 
-  eventSource.value.addEventListener('progress', (event: Event) => {
+  eventSource.value.addEventListener('processing', (event: Event) => {
     const customEvent = event as MessageEvent
     const data = JSON.parse(customEvent.data)
 
     processedItems.value = data.processed
-    progress.value = (data.processed / batchItems.value.length) * 100
+    progress.value = data.total > 0
+      ? (data.processed / data.total) * 100
+      : 0
     totalFileSize.value = formatFileSize(data.total_size || 0)
 
     if (data.message) {
@@ -412,13 +422,31 @@ const connectProgressStream = (batchId: string) => {
     eventSource.value?.close()
   })
 
-  eventSource.value.addEventListener('error', (event: Event) => {
+  eventSource.value.addEventListener('failed', (event: Event) => {
     const customEvent = event as MessageEvent
     const data = JSON.parse(customEvent.data)
     batchStatus.value = 'failed'
     errorMessage.value = data.error || 'Batch processing failed'
     eventSource.value?.close()
   })
+
+  eventSource.value.onerror = () => {
+    if (batchStatus.value === 'processing') {
+      recentMessages.value.unshift('Connection lost, retrying...')
+    }
+  }
+}
+
+const cancelBatch = async () => {
+  if (!currentBatchId.value) return
+  try {
+    await fetch(`/api/v1/batch/${currentBatchId.value}/cancel`, { method: 'POST' })
+    eventSource.value?.close()
+    batchStatus.value = 'failed'
+    errorMessage.value = 'Batch cancelled by user'
+  } catch {
+    // Ignore cancel errors
+  }
 }
 
 const downloadBatch = async () => {
@@ -463,36 +491,33 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped lang="css">
+<style scoped>
 .batch-generation-container {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  min-height: 100vh;
 }
 
 .batch-header {
-  margin-bottom: 2rem;
+  margin-bottom: var(--space-8);
   text-align: center;
 }
 
 .batch-header h2 {
-  font-size: 2rem;
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
+  font-size: var(--text-3xl);
+  color: var(--color-heading-on-shell);
+  margin-bottom: var(--space-2);
 }
 
 .subtitle {
-  color: #7f8c8d;
-  font-size: 1rem;
+  color: var(--color-shell-text-subtle);
+  font-size: var(--text-base);
 }
 
 .batch-content {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  margin-bottom: 2rem;
+  gap: var(--space-8);
+  margin-bottom: var(--space-8);
 }
 
 @media (max-width: 1024px) {
@@ -501,86 +526,88 @@ onUnmounted(() => {
   }
 }
 
-/* Left Panel */
-.batch-left-panel {
-  background: white;
-  border-radius: 12px;
-  padding: 2rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+/* Panels */
+.batch-panel {
+  background: var(--color-card-bg);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  border: 1px solid var(--color-card-border);
+  box-shadow: var(--shadow-md);
 }
 
-.upload-section h3,
-.batch-queue-section h3,
-.settings-section h3,
-.progress-section h3 {
-  font-size: 1.25rem;
-  color: #2c3e50;
-  margin-bottom: 1rem;
+.batch-panel h3 {
+  font-size: var(--text-lg);
+  color: var(--color-card-heading);
+  margin-bottom: var(--space-4);
 }
 
+/* Upload Zone */
 .upload-drop-zone {
-  border: 2px dashed #bdc3c7;
-  border-radius: 8px;
-  padding: 3rem 2rem;
+  border: 2px dashed var(--color-input-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12) var(--space-8);
   text-align: center;
   cursor: pointer;
-  transition: all 0.3s ease;
-  background: #f8f9fa;
+  transition: all var(--transition-slow) ease;
+  background: var(--color-card-bg-secondary);
+  color: var(--color-card-text-secondary);
 }
 
 .upload-drop-zone:hover,
 .upload-drop-zone.drag-active {
-  border-color: #3498db;
-  background: #e3f2fd;
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 .upload-icon {
-  width: 3rem;
-  height: 3rem;
-  margin-bottom: 1rem;
-  fill: #3498db;
+  width: var(--space-12);
+  height: var(--space-12);
+  margin-bottom: var(--space-4);
+  fill: var(--color-primary);
 }
 
 .file-label {
-  color: #3498db;
+  color: var(--color-primary);
   text-decoration: underline;
   cursor: pointer;
 }
 
+/* Batch Queue */
 .batch-queue-section {
-  margin-top: 2rem;
+  margin-top: var(--space-8);
 }
 
 .queue-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 
 .empty-queue {
-  padding: 2rem;
+  padding: var(--space-8);
   text-align: center;
-  color: #95a5a6;
-  background: #ecf0f1;
-  border-radius: 8px;
+  color: var(--color-card-text-muted);
+  background: var(--color-card-bg-secondary);
+  border-radius: var(--radius-lg);
 }
 
 .batch-items-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-3);
   max-height: 400px;
   overflow-y: auto;
 }
 
 .batch-item {
   display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 8px;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-card-bg-secondary);
+  border-radius: var(--radius-lg);
   align-items: flex-start;
+  border: 1px solid var(--color-card-border);
 }
 
 .item-thumbnail {
@@ -591,7 +618,7 @@ onUnmounted(() => {
   width: 60px;
   height: 60px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
 }
 
 .item-details {
@@ -600,10 +627,10 @@ onUnmounted(() => {
 }
 
 .item-name {
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   font-weight: 600;
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
+  color: var(--color-card-text);
+  margin-bottom: var(--space-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -611,66 +638,80 @@ onUnmounted(() => {
 
 .prompt-input {
   width: 100%;
-  padding: 0.5rem;
-  font-size: 0.85rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-family: monospace;
+  padding: var(--space-2);
+  font-size: var(--text-sm);
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  background: var(--color-input-bg);
+  color: var(--color-input-text);
+}
+
+.prompt-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
 }
 
 .btn-remove {
-  background: #e74c3c;
+  background: var(--color-danger);
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
   cursor: pointer;
   font-weight: bold;
-  transition: background 0.2s;
+  font-size: var(--text-lg);
+  line-height: 1;
+  transition: background var(--transition-fast);
 }
 
 .btn-remove:hover {
-  background: #c0392b;
+  background: var(--color-danger-hover);
 }
 
-/* Right Panel */
-.batch-right-panel {
-  background: white;
-  border-radius: 12px;
-  padding: 2rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
+/* Settings */
 .settings-section {
-  margin-bottom: 2rem;
+  margin-bottom: var(--space-8);
 }
 
 .setting-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-6);
 }
 
 .setting-group label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--color-card-text);
+  font-size: var(--text-sm);
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 500;
+  cursor: pointer;
 }
 
 .form-select,
 .form-textarea {
   width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #bdc3c7;
-  border-radius: 4px;
-  font-size: 0.95rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
   font-family: inherit;
+  background: var(--color-input-bg);
+  color: var(--color-input-text);
 }
 
 .form-select:focus,
 .form-textarea:focus {
   outline: none;
-  border-color: #3498db;
-  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
 }
 
 .form-textarea {
@@ -679,180 +720,199 @@ onUnmounted(() => {
 }
 
 .advanced-options {
-  margin: 1.5rem 0;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 4px;
+  margin: var(--space-6) 0;
+  padding: var(--space-4);
+  background: var(--color-card-bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-card-border);
   cursor: pointer;
 }
 
 .advanced-options summary {
   font-weight: 600;
-  color: #3498db;
+  color: var(--color-primary);
   user-select: none;
+  font-size: var(--text-sm);
 }
 
 .advanced-content {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid #ddd;
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-card-divider);
 }
 
+/* Progress */
 .progress-section {
-  margin-bottom: 2rem;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 8px;
+  margin-bottom: var(--space-8);
+  padding: var(--space-4);
+  background: var(--color-card-bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-card-border);
 }
 
 .status-idle {
-  color: #7f8c8d;
-  padding: 1rem;
+  color: var(--color-card-text-muted);
+  padding: var(--space-4);
 }
 
 .status-processing {
-  padding: 1rem;
+  padding: var(--space-4);
 }
 
 .progress-bar {
   width: 100%;
   height: 8px;
-  background: #ecf0f1;
-  border-radius: 4px;
+  background: var(--color-card-bg);
+  border-radius: var(--radius-full);
   overflow: hidden;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #3498db, #2ecc71);
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, var(--color-brand-start), var(--color-success));
+  transition: width var(--transition-slow) ease;
 }
 
 .progress-text {
-  font-size: 0.9rem;
-  color: #2c3e50;
+  font-size: var(--text-sm);
+  color: var(--color-card-text);
   font-weight: 600;
 }
 
 .status-completed {
-  padding: 1rem;
+  padding: var(--space-4);
 }
 
 .success-message {
-  color: #27ae60;
+  color: var(--color-success);
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
 }
 
 .status-failed {
-  padding: 1rem;
+  padding: var(--space-4);
 }
 
 .error-message {
-  color: #e74c3c;
+  color: var(--color-danger);
   font-weight: 600;
 }
 
+/* Buttons */
 .action-buttons {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .btn-primary,
 .btn-success,
 .btn-secondary,
+.btn-danger,
 .btn-secondary-small {
-  padding: 0.75rem 1.5rem;
+  padding: var(--space-3) var(--space-6);
   border: none;
-  border-radius: 6px;
-  font-size: 1rem;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-slow) ease;
+  font-family: inherit;
 }
 
 .btn-primary {
-  background: #3498db;
+  background: linear-gradient(135deg, var(--color-brand-start) 0%, var(--color-brand-end) 100%);
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #2980b9;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+  box-shadow: var(--shadow-brand);
 }
 
 .btn-primary:disabled {
-  background: #bdc3c7;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .btn-success {
-  background: #27ae60;
+  background: var(--color-success);
   color: white;
 }
 
 .btn-success:hover {
-  background: #229954;
+  background: var(--color-success-hover);
   transform: translateY(-2px);
 }
 
 .btn-secondary {
-  background: #95a5a6;
-  color: white;
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-btn-secondary-text);
+  border: 1px solid var(--color-btn-secondary-border);
 }
 
 .btn-secondary:hover {
-  background: #7f8c8d;
+  background: var(--color-btn-secondary-hover-bg);
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: white;
+}
+
+.btn-danger:hover {
+  background: var(--color-danger-hover);
 }
 
 .btn-secondary-small {
-  background: #95a5a6;
-  color: white;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-btn-secondary-text);
+  border: 1px solid var(--color-btn-secondary-border);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
 }
 
 .btn-secondary-small:hover {
-  background: #7f8c8d;
+  background: var(--color-btn-secondary-hover-bg);
 }
 
 /* Progress Ticker */
 .progress-ticker {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background: var(--color-card-bg);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  border: 1px solid var(--color-card-border);
+  box-shadow: var(--shadow-md);
 }
 
 .ticker-label {
   font-weight: 600;
-  color: #2c3e50;
-  margin-bottom: 0.75rem;
+  color: var(--color-card-heading);
+  margin-bottom: var(--space-3);
 }
 
 .ticker-messages {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 1rem;
+  background: var(--color-card-bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
   max-height: 150px;
   overflow-y: auto;
-  font-size: 0.9rem;
-  font-family: monospace;
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
 }
 
 .ticker-msg {
-  color: #34495e;
-  margin-bottom: 0.5rem;
+  color: var(--color-card-text-secondary);
+  margin-bottom: var(--space-2);
   line-height: 1.4;
 }
 
 small {
   display: block;
-  margin-top: 0.25rem;
-  color: #7f8c8d;
-  font-size: 0.85rem;
+  margin-top: var(--space-1);
+  color: var(--color-card-text-muted);
+  font-size: var(--text-sm);
 }
 </style>

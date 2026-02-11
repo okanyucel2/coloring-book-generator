@@ -53,6 +53,11 @@
         <WorkbookBuilder />
       </div>
 
+      <!-- Batch Generation Tab -->
+      <div v-show="activeTab === 'batch'" class="tab-content">
+        <BatchGenerationUI />
+      </div>
+
       <!-- Prompt Library Tab -->
       <div v-show="activeTab === 'library'" class="tab-content">
         <PromptLibraryUI />
@@ -138,6 +143,7 @@ import VariationHistoryComparison from '@/components/VariationHistoryComparison.
 import ComparisonLayout from '@/components/ComparisonLayout.vue'
 import PromptCustomizationForm from '@/components/PromptCustomizationForm.vue'
 import ModelOutputPanel from '@/components/ModelOutputPanel.vue'
+import BatchGenerationUI from '@/components/BatchGenerationUI.vue'
 import { apiService } from '@/services/api'
 
 interface Tab {
@@ -168,6 +174,7 @@ interface GeneratePayload {
 
 const tabs: Tab[] = [
   { id: 'workbook', label: 'Workbook Builder', icon: '\u{1F4D6}' },
+  { id: 'batch', label: 'Batch', icon: '\u{1F4E6}' },
   { id: 'library', label: 'Prompt Library', icon: '\u{1F4DA}' },
   { id: 'history', label: 'Variation History', icon: '\u{1F4C5}' },
   { id: 'comparison', label: 'Model Comparison', icon: '\u{1F4C8}' },
