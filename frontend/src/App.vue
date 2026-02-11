@@ -252,12 +252,6 @@ const MODEL_COSTS: Record<string, number> = {
   'imagen-ultra': 0.06,
 }
 
-const formatBytes = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
 const generateWithModel = async (modelId: string) => {
   if (!comparisonPrompt.value) return
   isComparing.value = true
@@ -280,23 +274,11 @@ const generateWithModel = async (modelId: string) => {
 
     const durationSec = ((performance.now() - startTime) / 1000).toFixed(1)
 
-    // Fetch image to get actual file size (use GET with abort to avoid HEAD 405)
-    let sizeStr = '—'
-    try {
-      const controller = new AbortController()
-      const resp = await fetch(result.imageUrl, { signal: controller.signal })
-      const contentLength = resp.headers.get('content-length')
-      if (contentLength) {
-        sizeStr = formatBytes(parseInt(contentLength, 10))
-      }
-      controller.abort()  // Don't download the whole body
-    } catch { /* ignore size fetch errors */ }
-
     if (comparisonRef.value) {
       comparisonRef.value.setModelOutput(modelId, result.imageUrl, {
         duration: durationSec,
         cost: (MODEL_COSTS[modelId] ?? 0).toFixed(3),
-        size: sizeStr,
+        size: '—',
         cached: false,
       })
     }
