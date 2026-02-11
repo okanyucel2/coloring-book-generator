@@ -141,9 +141,19 @@ else:
     logger.info("Google auth not configured (missing JWT_SECRET/GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET)")
 
 # CORS must be added LAST so it's the outermost middleware and handles preflight OPTIONS
+# NOTE: allow_origins=["*"] + allow_credentials=True is invalid per CORS spec.
+# Browsers reject responses with Access-Control-Allow-Origin: * when credentials are present.
+# List specific origins so Starlette reflects the actual origin header.
+_cors_origins = [
+    "https://coloring-book-web-oha0.onrender.com",
+    "http://localhost:5173",
+    "http://localhost:19049",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:19049",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
