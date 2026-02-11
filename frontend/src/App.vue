@@ -280,14 +280,16 @@ const generateWithModel = async (modelId: string) => {
 
     const durationSec = ((performance.now() - startTime) / 1000).toFixed(1)
 
-    // Fetch image to get actual file size
+    // Fetch image to get actual file size (use GET with abort to avoid HEAD 405)
     let sizeStr = '—'
     try {
-      const headResp = await fetch(result.imageUrl, { method: 'HEAD' })
-      const contentLength = headResp.headers.get('content-length')
+      const controller = new AbortController()
+      const resp = await fetch(result.imageUrl, { signal: controller.signal })
+      const contentLength = resp.headers.get('content-length')
       if (contentLength) {
         sizeStr = formatBytes(parseInt(contentLength, 10))
       }
+      controller.abort()  // Don't download the whole body
     } catch { /* ignore size fetch errors */ }
 
     if (comparisonRef.value) {

@@ -15,8 +15,9 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -345,6 +346,28 @@ def _map_model(model: str) -> str:
     return mapping.get(model, "gemini")
 
 
+def _get_public_base_url(request: Request) -> str:
+    """Build this server's public URL from reverse-proxy headers."""
+    proto = request.headers.get("x-forwarded-proto", "https")
+    host = request.headers.get("host", "localhost")
+    return f"{proto}://{host}"
+
+
+@app.get("/api/v1/images/{filename}")
+async def serve_image(filename: str):
+    """Proxy image from Genesis core backend to avoid CORS issues."""
+    genesis_url = f"{GENESIS_BASE_URL}/api/v1/image-generation/serve/{filename}"
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.get(genesis_url)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=404, detail="Image not found")
+    return Response(
+        content=resp.content,
+        media_type=resp.headers.get("content-type", "image/png"),
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 async def generate_image(
     prompt: str,
     model: str,
@@ -357,7 +380,7 @@ async def generate_image(
     the Genesis backend which routes to Gemini/Imagen.
 
     Returns:
-        dict with keys: image_url, seed, model
+        dict with keys: image_filename, seed, model
     """
     actual_seed = seed if seed is not None else random.randint(0, 2**31)
     url = f"{GENESIS_BASE_URL}/api/v1/image-generation/generate"
@@ -371,12 +394,13 @@ async def generate_image(
         resp = await client.post(url, json=payload)
         resp.raise_for_status()
     data = resp.json()
-    image_url = f"{GENESIS_BASE_URL}{data['serve_url']}"
-    return {"image_url": image_url, "seed": actual_seed, "model": model}
+    # Extract just the filename for local proxy serving
+    filename = data['serve_url'].rsplit('/', 1)[-1]
+    return {"image_filename": filename, "seed": actual_seed, "model": model}
 
 
 @app.post("/api/v1/generate", status_code=201)
-async def generate(body: GenerateRequest, db: AsyncSession = Depends(get_db)):
+async def generate(body: GenerateRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Generate a coloring book image using the specified model."""
     try:
         result = await generate_image(
@@ -391,10 +415,14 @@ async def generate(body: GenerateRequest, db: AsyncSession = Depends(get_db)):
         logger.warning(f"Image generation failed: {exc}")
         raise HTTPException(status_code=502, detail=f"Image generation failed: {exc}")
 
+    # Build image URL through our own proxy to avoid CORS
+    base = _get_public_base_url(request)
+    image_url = f"{base}/api/v1/images/{result['image_filename']}"
+
     variation = Variation(
         prompt=body.prompt,
         model=result["model"],
-        image_url=result["image_url"],
+        image_url=image_url,
         seed=result["seed"],
         parameters={"style": body.style},
     )
